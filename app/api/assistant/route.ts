@@ -67,7 +67,7 @@ export async function POST(request:NextRequest){
  }catch(error){
   const category=classifyGeminiError(error);
   const status=category==="rate_limit"||category==="project_quota"?503:category==="timeout"||category==="network"?504:502;
-  const message=category==="project_quota"?"Gemini project quota/billing limit reached; adding another key will not fix this.":category==="rate_limit"?"All available Gemini key slots are rate-limited or cooling down.":category==="timeout"||category==="network"?"All available Gemini key attempts failed temporarily.":category==="model_not_found"?"The configured Gemini model is unavailable.":"Gemini assistant is unavailable. Your data was not changed.";
+  const message=category==="project_quota"?"Gemini project quota/billing limit reached; adding another key will not fix this.":category==="rate_limit"?"All available Gemini key slots are rate-limited or cooling down. Keys from the same project share quotas; try later or configure a key from a project with available quota.":category==="timeout"||category==="network"?"All available Gemini key attempts failed temporarily.":category==="model_not_found"?"The configured Gemini model is unavailable.":"Gemini assistant is unavailable. Your data was not changed.";
   return NextResponse.json({error:message,category},{status});
  }
 }
