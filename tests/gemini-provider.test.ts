@@ -13,14 +13,14 @@ afterEach(() => resetGeminiProviderStateForTests());
 describe("Gemini key configuration", () => {
   it("uses numbered slots and never returns raw key values in status", () => {
     const env = {GEMINI_API_KEY_1: "secret-one", GEMINI_API_KEY_2: "secret-two", GEMINI_API_KEY_4: "secret-four", GEMINI_API_KEY: "legacy-secret"};
-    expect(configuredGeminiKeys(env as NodeJS.ProcessEnv).map((slot) => slot.label)).toEqual(["Slot 1", "Slot 2", "Slot 4"]);
-    const status = getGeminiProviderStatus(env as NodeJS.ProcessEnv);
+    expect(configuredGeminiKeys(env as unknown as NodeJS.ProcessEnv).map((slot) => slot.label)).toEqual(["Slot 1", "Slot 2", "Slot 4"]);
+    const status = getGeminiProviderStatus(env as unknown as NodeJS.ProcessEnv);
     expect(status.configured).toBe(true);
     expect(JSON.stringify(status)).not.toContain("secret-one");
     expect(JSON.stringify(status)).not.toContain("legacy-secret");
   });
   it("keeps legacy key configuration working when numbered slots are absent", () => {
-    expect(configuredGeminiKeys({GEMINI_API_KEY: "legacy-secret"} as NodeJS.ProcessEnv)).toEqual([{label: "Legacy fallback", apiKey: "legacy-secret"}]);
+    expect(configuredGeminiKeys({GEMINI_API_KEY: "legacy-secret"} as unknown as NodeJS.ProcessEnv)).toEqual([{label: "Legacy fallback", apiKey: "legacy-secret"}]);
   });
 });
 describe("Gemini failure classification", () => {
@@ -51,7 +51,7 @@ describe("Gemini key failover", () => {
     const status = getGeminiProviderStatus({
       GEMINI_API_KEY_1: "private-one", GEMINI_API_KEY_2: "private-two",
       GEMINI_API_KEY_3: "private-three", GEMINI_API_KEY_4: "private-four", GEMINI_MODEL: "test-model",
-    } as NodeJS.ProcessEnv);
+    } as unknown as NodeJS.ProcessEnv);
     expect(status.activeSlot).toBe("Slot 2");
     expect(JSON.stringify(status)).not.toContain("private-one");
   });
