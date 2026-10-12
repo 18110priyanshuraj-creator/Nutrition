@@ -28,7 +28,7 @@ Configure private server-side environment variables:
 
 The previous \`GEMINI_API_KEY\` variable remains a fallback when no numbered slot is set. Never commit secret values or expose them in logs.
 
-Timeouts, network errors, per-key rate limits and key-specific credential errors can rotate to another available key. A project-wide quota/billing error, bad model or invalid request is reported early, because cycling keys will not fix those conditions. Cooldowns and the last successful slot are held in server-process memory and reset when the process restarts.
+Timeouts, network errors and key-specific credential errors rotate to another available slot. Rate-limit responses also try a bounded number of slots, but Gemini rate limits are project-scoped: keys from the same Google AI project share quotas, so rotation only helps when another slot has a usable independent project/quota. Explicit project-wide quota or billing errors, invalid models and invalid requests stop early. Cooldowns and the last successful slot are held in server-process memory and reset when the process restarts.
 
 ## Safety model
 
