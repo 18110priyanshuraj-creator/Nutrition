@@ -68,7 +68,7 @@ export async function POST(request:NextRequest){
  let resultText:string;
  try{
   const contents=imageData?[prompt,{inlineData:{mimeType:imageData.mimeType,data:imageData.data}}]:prompt;
-  const response=await ai.models.generateContent({model,contents,config:{temperature:0.1,maxOutputTokens:1800,responseMimeType:"application/json",responseJsonSchema:responseJsonSchema as never}});
+  const response=await ai.models.generateContent({model,contents,config:{temperature:0.1,maxOutputTokens:1800,responseFormat:{text:{mimeType:"application/json",schema:responseJsonSchema}}}});
   resultText=response.text||"";
  }catch(error){const failure=safeGeminiError(error);return NextResponse.json({error:failure.message,manualEntryAvailable:true},{status:failure.status});}
  let parsedJson:unknown;
