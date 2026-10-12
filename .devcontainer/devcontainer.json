@@ -1,0 +1,9 @@
+{
+  "name": "MyNutri AI",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "features": {"ghcr.io/devcontainers/features/git:1": {}},
+  "forwardPorts": [3000],
+  "portsAttributes": {"3000": {"label": "MyNutri AI", "onAutoForward": "openBrowser"}},
+  "postCreateCommand": "npm install",
+  "remoteEnv": {"TZ": "Asia/Kolkata"}
+}
