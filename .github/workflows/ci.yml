@@ -19,6 +19,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Database migration smoke test
+        run: npm run db:migrate
       - name: Run unit tests
         run: npm test
       - name: Lint
