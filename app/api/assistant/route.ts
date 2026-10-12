@@ -34,6 +34,10 @@ export async function POST(request:NextRequest){
  };
  const q=parsed.data.question;
  const normalized=q.toLowerCase();
+ const mealIntent=/\b(add|log|record|track|save|kha|khaya|khayi|khaye)\b/i.test(q)&&/\b(food|meal|breakfast|lunch|dinner|snack|roti|chapati|rice|doodh|milk|banana|dal|paneer|curd|dahi|rajma|chawal|til|badam|egg|anda)\b|\d+\s*(g|gm|gram|grams|ml|piece|pieces|roti|katori|bowl|cup|glass)\b/i.test(q);
+ if(mealIntent)return NextResponse.json({mode:"action-proposal",answer:"I prepared a possible food-entry draft from your request. Nothing has been saved. Review the date, meal category, food matches and grams, then explicitly confirm the meal before it is stored.",actionProposal:{type:"prepare_meal_draft",description:q,requiresUserConfirmation:true},notice:"AI-proposed actions never change your history without your confirmation."});
+ const editIntent=/\b(edit|correct|change|update|delete|remove)\b/i.test(q)&&/\b(meal|entry|food|breakfast|lunch|dinner|snack|record)\b/i.test(q);
+ if(editIntent)return NextResponse.json({mode:"action-proposal",answer:"I have not changed or deleted anything. Open saved meal history, select the correct date, and use the explicit edit or delete control on the matching entry.",actionProposal:{type:"review_meal_history",date,requiresUserConfirmation:true},notice:"The assistant cannot identify an exact target entry safely from this sentence alone."});
  if(!process.env.GEMINI_API_KEY||!process.env.GEMINI_MODEL){
   if(/protein/.test(normalized)){
    const v=totals.protein_g,t=targets.protein_g;
