@@ -1,3 +1,4 @@
+import {requireOwner} from "@/lib/server-auth";
 import {NextRequest,NextResponse} from "next/server";
 import {z} from "zod";
 import {getDb} from "@/lib/db";
@@ -15,11 +16,13 @@ const mealSchema=z.object({
  items:z.array(z.object({foodId:z.string().min(1).max(100),grams:z.number().positive().max(10000),portionEstimated:z.boolean().default(false)})).min(1).max(30)
 });
 export async function GET(request:NextRequest){
+ const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
  const date=request.nextUrl.searchParams.get("date")||indiaDate();
  if(!isDate(date))return NextResponse.json({error:"Date must be YYYY-MM-DD."},{status:400});
  return NextResponse.json({date,meals:mealsForDate(date)},{headers:{"Cache-Control":"no-store"}});
 }
 export async function POST(request:NextRequest){
+ const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
  const parsed=mealSchema.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return NextResponse.json({error:"Meal fields or portion sizes are invalid."},{status:400});
  const loggedAt=parsed.data.loggedAt||new Date().toISOString();const date=parsed.data.localDate||indiaDate(new Date(loggedAt));
