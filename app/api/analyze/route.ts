@@ -9,12 +9,12 @@ export const dynamic="force-dynamic";
 const limits=new Map<string,{count:number;start:number}>();
 const proposalSchema=z.object({items:z.array(z.object({foodName:z.string().min(1).max(120),amount:z.number().positive().max(10000),unit:z.string().min(1).max(24),preparation:z.string().max(160),confidence:z.enum(["low","medium","high"]),notes:z.string().max(240)})).max(30),summary:z.string().max(400)});
 const responseJsonSchema={
- type:"OBJECT",properties:{
-  items:{type:"ARRAY",items:{type:"OBJECT",properties:{
-   foodName:{type:"STRING"},amount:{type:"NUMBER"},unit:{type:"STRING",enum:["g","ml","piece","roti","katori","bowl","cup","glass","tbsp","tsp"]},
-   preparation:{type:"STRING"},confidence:{type:"STRING",enum:["low","medium","high"]},notes:{type:"STRING"}
+ type:"object",properties:{
+  items:{type:"array",items:{type:"object",properties:{
+   foodName:{type:"string"},amount:{type:"number"},unit:{type:"string",enum:["g","ml","piece","roti","katori","bowl","cup","glass","tbsp","tsp"]},
+   preparation:{type:"string"},confidence:{type:"string",enum:["low","medium","high"]},notes:{type:"string"}
   },required:["foodName","amount","unit","preparation","confidence","notes"],propertyOrdering:["foodName","amount","unit","preparation","confidence","notes"]}},
-  summary:{type:"STRING"}
+  summary:{type:"string"}
  },required:["items","summary"],propertyOrdering:["summary","items"]
 };
 function rateLimit(request:NextRequest):boolean{
@@ -68,7 +68,7 @@ export async function POST(request:NextRequest){
  let resultText:string;
  try{
   const contents=imageData?[prompt,{inlineData:{mimeType:imageData.mimeType,data:imageData.data}}]:prompt;
-  const response=await ai.models.generateContent({model,contents,config:{temperature:0.1,maxOutputTokens:1800,responseFormat:{text:{mimeType:"application/json",schema:responseJsonSchema}}}});
+  const response=await ai.models.generateContent({model,contents,config:{temperature:0.1,maxOutputTokens:1800,responseMimeType:"application/json",responseJsonSchema:responseJsonSchema as never}});
   resultText=response.text||"";
  }catch(error){const failure=safeGeminiError(error);return NextResponse.json({error:failure.message,manualEntryAvailable:true},{status:failure.status});}
  let parsedJson:unknown;

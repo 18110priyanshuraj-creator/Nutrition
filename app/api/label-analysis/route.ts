@@ -17,15 +17,15 @@ const schema=z.object({
  issues:z.array(z.string().max(200)).max(12)
 });
 const jsonSchema={
- type:"OBJECT",properties:{
-  productName:{type:"STRING"},servingSizeText:{type:"STRING"},servingGrams:{type:["NUMBER","NULL"]},
-  basis:{type:"STRING",enum:["per_100g","per_serving"]},
-  nutrients:{type:"ARRAY",items:{type:"OBJECT",properties:{
-   label:{type:"STRING"},key:{type:["STRING","NULL"],enum:[...keyList,"other",null]},
-   value:{type:["NUMBER","NULL"]},unit:{type:"STRING"},
-   confidence:{type:"STRING",enum:["low","medium","high"]},note:{type:"STRING"}
+ type:"object",properties:{
+  productName:{type:"string"},servingSizeText:{type:"string"},servingGrams:{type:["number","null"]},
+  basis:{type:"string",enum:["per_100g","per_serving"]},
+  nutrients:{type:"array",items:{type:"object",properties:{
+   label:{type:"string"},key:{type:["string","null"],enum:[...keyList,"other",null]},
+   value:{type:["number","null"]},unit:{type:"string"},
+   confidence:{type:"string",enum:["low","medium","high"]},note:{type:"string"}
   },required:["label","key","value","unit","confidence","note"],propertyOrdering:["label","key","value","unit","confidence","note"]}},
-  overallConfidence:{type:"STRING",enum:["low","medium","high"]},issues:{type:"ARRAY",items:{type:"STRING"}}
+  overallConfidence:{type:"string",enum:["low","medium","high"]},issues:{type:"array",items:{type:"string"}}
  },required:["productName","servingSizeText","servingGrams","basis","nutrients","overallConfidence","issues"],propertyOrdering:["productName","servingSizeText","servingGrams","basis","nutrients","overallConfidence","issues"]
 };
 const attempts=()=>{const n=Number(process.env.GEMINI_MAX_RETRIES??1);return 1+(Number.isFinite(n)?Math.max(0,Math.min(2,Math.floor(n))):1);};
@@ -54,7 +54,7 @@ export async function POST(request:NextRequest){
  const timeoutRaw=Number(process.env.GEMINI_REQUEST_TIMEOUT_MS??20000),timeout=Number.isFinite(timeoutRaw)?Math.max(3000,Math.min(60000,timeoutRaw)):20000;
  try{
   const ai=new GoogleGenAI({apiKey:key,httpOptions:{timeout,retryOptions:{attempts:attempts()}}});
-  const response=await ai.models.generateContent({model,contents:[{text:prompt},{inlineData:{mimeType,data:Buffer.from(bytes).toString("base64")}}],config:{temperature:0,maxOutputTokens:2400,responseFormat:{text:{mimeType:"application/json",schema:jsonSchema}}}});
+  const response=await ai.models.generateContent({model,contents:[{text:prompt},{inlineData:{mimeType,data:Buffer.from(bytes).toString("base64")}}],config:{temperature:0,maxOutputTokens:2400,responseMimeType:"application/json",responseJsonSchema:jsonSchema as never}});
   if(!response.text)return NextResponse.json({error:"Gemini returned no label text. Nothing was saved."},{status:502});
   let raw:unknown;try{raw=JSON.parse(response.text);}catch{return NextResponse.json({error:"Gemini returned malformed label data. Nothing was saved."},{status:502});}
   const parsed=schema.safeParse(raw);if(!parsed.success)return NextResponse.json({error:"The label proposal did not pass validation. Nothing was saved."},{status:502});
