@@ -1,9 +1,11 @@
+import {requireOwner} from "@/lib/server-auth";
 import {NextRequest,NextResponse} from "next/server";
 import {getDb} from "@/lib/db";
 import {readJson} from "@/lib/server-data";
 export const runtime="nodejs";
 function csvCell(value:unknown):string {const raw=value===null||value===undefined?"":String(value);return '"'+raw.replace(/"/g,'""')+'"';}
 export async function GET(request:NextRequest){
+ const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
  const format=request.nextUrl.searchParams.get("format")==="csv"?"csv":"json";
  const db=getDb();
  const profile=db.prepare("SELECT * FROM profiles WHERE id=1").get();
