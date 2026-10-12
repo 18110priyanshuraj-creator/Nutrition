@@ -14,7 +14,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:migrate": "tsx scripts/migrate.ts",
-    "foods:import": "tsx scripts/import-foods.ts"
+    "foods:import": "tsx scripts/import-foods.ts",
+    "agent": "tsx scripts/agent.ts",
+    "agent:doctor": "tsx scripts/agent.ts doctor",
+    "agent:scan": "tsx scripts/agent.ts scan",
+    "agent:watch": "tsx scripts/agent.ts watch",
+    "agent:memory": "tsx scripts/agent.ts memory"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

@@ -1,31 +1,35 @@
 import {requireOwner} from "@/lib/server-auth";
-import { GoogleGenAI } from "@google/genai";
-import { NextResponse } from "next/server";
-export const runtime = "nodejs";
+import {GoogleGenAI} from "@google/genai";
+import {NextResponse} from "next/server";
+import {classifyGeminiError,getGeminiProviderStatus,hasGeminiKey,withGeminiKeyFailover} from "@/lib/agent/gemini-provider";
+export const runtime="nodejs";
+export const dynamic="force-dynamic";
+
 export async function GET(request:Request) {
-  const unauthorized = await requireOwner(request); if (unauthorized) return unauthorized;
-  const configured = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_MODEL);
+  const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
+  const status=getGeminiProviderStatus();
   return NextResponse.json({
-    provider: "Google Gemini", configured,
-    modelConfigured: Boolean(process.env.GEMINI_MODEL),
-    keyConfigured: Boolean(process.env.GEMINI_API_KEY),
-    message: configured ? "Gemini is configured. Run a test request to verify access." :
-      "Set GEMINI_API_KEY and GEMINI_MODEL in the server environment. Secret values are never returned."
-  });
+    ...status,
+    message:status.configured&&status.modelConfigured
+      ?"Gemini key failover is configured. Run a test request to verify access."
+      :"Set GEMINI_MODEL and GEMINI_API_KEY_1 through GEMINI_API_KEY_4 on the server; legacy GEMINI_API_KEY remains supported.",
+  },{headers:{"Cache-Control":"no-store"}});
 }
 export async function POST(request:Request) {
-  const unauthorized = await requireOwner(request); if (unauthorized) return unauthorized;
-  const key = process.env.GEMINI_API_KEY, model = process.env.GEMINI_MODEL;
-  if (!key || !model) return NextResponse.json({ ok: false, error: "GEMINI_API_KEY and GEMINI_MODEL must both be configured." }, { status: 503 });
+  const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
+  const model=process.env.GEMINI_MODEL?.trim();
+  if(!hasGeminiKey()||!model) return NextResponse.json({ok:false,error:"Configure GEMINI_MODEL and at least one Gemini API key slot."},{status:503});
   try {
-    const ai = new GoogleGenAI({ apiKey: key, httpOptions: { timeout: Math.max(3000, Math.min(30000, Number(process.env.GEMINI_REQUEST_TIMEOUT_MS || 15000))), retryOptions: { attempts: 1 } } });
-    const response = await ai.models.generateContent({ model, contents: "Reply with exactly: MyNutri AI connection check", config: { maxOutputTokens: 24, temperature: 0 } });
-    if (!response.text) return NextResponse.json({ ok: false, error: "The model returned no text." }, { status: 502 });
-    return NextResponse.json({ ok: true, model, checkedAt: new Date().toISOString(), message: "Gemini accepted the test request." });
-  } catch (reason) {
-    const message = String(reason instanceof Error ? reason.message : reason).toLowerCase();
-    const status = message.includes("429") || message.includes("quota") ? 503 : message.includes("timeout") ? 504 : 502;
-    const error = status === 503 ? "Gemini quota/rate limit reached." : status === 504 ? "Gemini test request timed out." : "Gemini test failed. Check model availability, project access, and network configuration.";
-    return NextResponse.json({ ok: false, error }, { status });
+    const response=await withGeminiKeyFailover(async (apiKey)=>{
+      const ai=new GoogleGenAI({apiKey,httpOptions:{timeout:Math.max(3000,Math.min(120000,Number(process.env.GEMINI_REQUEST_TIMEOUT_MS||60000))),retryOptions:{attempts:1}}});
+      return ai.models.generateContent({model,contents:"Reply with exactly: MyNutri AI connection check",config:{maxOutputTokens:24,temperature:0}});
+    });
+    if(!response.text) return NextResponse.json({ok:false,error:"The model returned no text."},{status:502});
+    return NextResponse.json({ok:true,model,checkedAt:new Date().toISOString(),activeSlot:getGeminiProviderStatus().activeSlot,message:"Gemini accepted the test request."},{headers:{"Cache-Control":"no-store"}});
+  } catch(error) {
+    const category=classifyGeminiError(error);
+    const status=category==="rate_limit"||category==="project_quota"||category==="model_not_found"?503:category==="timeout"?504:category==="invalid_request"?400:502;
+    const message=category==="project_quota"?"Gemini project-wide quota/billing limit reached.":category==="rate_limit"?"All available key slots are rate-limited or cooling down.":category==="invalid_key"||category==="permission"?"Gemini credential or project permission failure.":category==="model_not_found"?"Configured model was not found or is unavailable.":category==="timeout"?"Gemini request timed out after key failover.":"Gemini test failed after key failover.";
+    return NextResponse.json({ok:false,error:message,category,activeSlot:getGeminiProviderStatus().activeSlot},{status,headers:{"Cache-Control":"no-store"}});
   }
 }
