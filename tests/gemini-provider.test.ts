@@ -28,6 +28,9 @@ describe("Gemini failure classification", () => {
     expect(classifyGeminiError(new Error("request timed out"))).toBe("timeout");
     expect(classifyGeminiError({status: 429, message: "Too many requests"})).toBe("rate_limit");
     expect(classifyGeminiError({status: 401, message: "API key invalid"})).toBe("invalid_key");
+    expect(classifyGeminiError({status: 400, message: "API_KEY_INVALID"})).toBe("invalid_key");
+    expect(classifyGeminiError({status: 402, message: "payment required"})).toBe("project_quota");
+    expect(classifyGeminiError({status: 503, message: "service unavailable"})).toBe("network");
     expect(classifyGeminiError({status: 404, message: "model not found"})).toBe("model_not_found");
     expect(classifyGeminiError(new Error("project-wide quota exceeded"))).toBe("project_quota");
   });
