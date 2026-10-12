@@ -13,7 +13,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:migrate": "tsx scripts/migrate.ts"
+    "db:migrate": "tsx scripts/migrate.ts",
+    "foods:import": "tsx scripts/import-foods.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
