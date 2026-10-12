@@ -31,7 +31,7 @@ SQLite suits one personal instance. In production, mount a persistent disk and s
 A guarded local maintenance CLI can run the project's lint, typecheck, test and production-build checks, attempt bounded Gemini-generated fixes on the **current branch**, verify every change, and save lessons only from passing repairs.
 
 - Run `npm run agent -- doctor` for checks only.
-- Run `npm run agent -- scan` to check and attempt safe fixes.
+- Run `npm run agent -- scan` to check, repair failures, and audit changed code for concrete bugs when Gemini is configured.
 - Run `npm run agent -- "describe a focused task"` to request a code change.
 - Run `npm run agent:watch` to monitor changes while the Codespace process remains alive.
 - Run `npm run agent -- status` to inspect redacted four-slot Gemini failover status.
