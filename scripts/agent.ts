@@ -11,7 +11,7 @@ import {configuredGeminiKeys, getGeminiProviderStatus, GeminiFailoverError, with
 type Check = {name: string; ok: boolean; output: string; durationMs: number};
 type Memory = {
   version: 1;
-  runs: Array<{at: string; command: string; ok: boolean; summary: string; files?: string[]}>;
+  runs: Array<{at: string; command: string; ok: boolean; summary: string; files?: string[]; checks?: string[]}>;
   lessons: Array<{at: string; signature: string; lesson: string; files: string[]}>;
   watch: {fingerprint: string; scannedAt: string; lastRepairFingerprint?: string} | null;
 };
