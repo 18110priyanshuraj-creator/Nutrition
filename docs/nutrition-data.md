@@ -1,24 +1,41 @@
 # Nutrition data and target provenance
 
-## Reference links to evaluate
+## Official Indian sources checked
 
-- ICMR–National Institute of Nutrition: https://www.nin.res.in/
-- ICMR–NIN RDA/EAR report 2024: https://www.nin.res.in/RDA_Full_Report_2024.html
-- Indian Food Composition Tables 2017 information: consult the official NIN publication/catalogue and its current terms of use.
-- Google GenAI JavaScript SDK and structured JSON output: https://ai.google.dev/gemini-api/docs
+- **ICMR–National Institute of Nutrition (NIN):** https://www.nin.res.in/
+- **Indian Food Composition Tables (IFCT) 2017, official NIN PDF:** https://www.nin.res.in/ebooks/IFCT2017.pdf
+- **NIN publication/catalogue page for RDA and EAR:** https://www.nin.res.in/RDA_Full_Report_2024.html
+- **Official NIN downloads:** https://www.nin.res.in/downloads/
+- **Official Gemini structured-output documentation:** https://ai.google.dev/gemini-api/docs/generate-content/structured-output
 
-## Important source-status rule
+The official NIN publications page describes its RDA/EAR publication as the ICMR-NIN Expert Group's **RDA/EAR 2020**. The URL contains “2024” but is not proof that all age-specific reference values were revised in 2024. Verify the edition and age/sex tables before presenting values as official reference recommendations.
 
-The initial food records in this repository are provisional, generic estimates. They are not certified extracts from an exact IFCT row, and the small starter catalog does not comprehensively cover every nutrient, recipe, region, brand, or cooking method. Do not label it comprehensive or verified.
+## Verified status of this application
 
-Before importing any published composition dataset, check that the actual file/publication is official, the specific record and edible/preparation basis match, and the license/terms permit the intended storage and redistribution. Preserve the dataset name, edition/version, record identifier, value, original unit, conversion method and import timestamp.
+The initial food catalogue is a small list of **provisional generic estimates**, not an IFCT import. Values must not be called official or comprehensive.
 
-Missing values must remain unknown. A record missing a nutrient does not establish zero intake. Vitamin A forms, folate reporting conventions, niacin equivalents, fatty-acid coverage and cooked/raw distinctions need explicit source-specific treatment.
+The official IFCT 2017 document is available as a PDF. This checkpoint has **not** confirmed a structured machine-readable edition and redistribution license authorizing copied data in this public repository. Therefore no IFCT records have been imported or marked verified. The normalized import tool is available as `npm run foods:import`; it defaults to a dry run and requires the operator to specify the dataset/version, source URL, license note and `licenseConfirmed: true`. That field is the operator's assertion, not independent license verification or legal advice.
 
-## User goals versus reference guidance
+A future import should be based on actual source rows and preserve dataset/version, source-record identifier, source URL, license/terms, preparation/edible basis, original values and units, canonical values and conversions. Do not scrape or redistribute restricted files. Run a dry run, review duplicates and conversions, then test in a disposable database before importing production data.
 
-The default targets stored by the app are user-provided preferences from the project brief. They are not assertions about medically optimal intake. If age/sex-specific reference values or upper limits are displayed later, version and cite the exact authoritative reference separately. A food log is not a diagnostic test for nutrient deficiency or blood levels.
+## Missing values and reporting conventions
 
-## Import policy
+Missing nutrients remain unknown, not zero. This starter catalogue does not comprehensively cover all foods or nutrients. A total is marked incomplete if any logged food lacks the nutrient field.
 
-Any future CSV/JSON import should validate required columns, units, serving basis, source metadata, duplicate IDs and numeric ranges before changing production records. Run a dry-run report first and preserve an import audit trail. Never fill missing nutrients with invented values.
+Do not assume vitamin A values in IU, retinol, carotenoid equivalents or retinol activity equivalents are interchangeable. Vitamin D conversion uses 1 µg = 40 IU. Check source conventions for folate versus dietary folate equivalents and niacin versus niacin equivalents. Do not combine raw/cooked or different edible-portion values without an explicit valid conversion.
+
+## User targets and health guidance
+
+Initial targets are user-configured preferences, not medically validated prescriptions. Keep them separate from age/sex-appropriate reference recommendations and any applicable upper limits. The app estimates food intake; it does not test blood levels, diagnose nutrient deficiency, predict final height or prescribe supplements.
+
+## Normalized import input
+
+Dry run first:
+
+    npm run foods:import -- /path/to/normalized-foods.json
+
+Only apply after independently checking source values, conversion rules and usage rights:
+
+    npm run foods:import -- /path/to/normalized-foods.json --apply
+
+See `docs/food-import-format.md` for a format-only example. That example is not a real nutrition record.

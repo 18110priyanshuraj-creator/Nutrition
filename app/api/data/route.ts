@@ -12,6 +12,7 @@ export async function DELETE(request:NextRequest){
  const db=getDb();const now=new Date().toISOString();
  const tx=db.transaction(()=>{
   db.prepare("DELETE FROM meal_logs").run();
+  db.prepare("DELETE FROM recipes").run();
   db.prepare("DELETE FROM measurements").run();
   db.prepare("DELETE FROM daily_notes").run();
   db.prepare("DELETE FROM foods WHERE confidence='user'").run();
@@ -21,5 +22,5 @@ export async function DELETE(request:NextRequest){
   for(const n of NUTRIENTS)save.run(n.key,n.target,n.targetMin??null,n.targetMax??null,n.canonicalUnit,now);
  });
  tx();
- return NextResponse.json({ok:true,message:"Personal meal logs, measurements, notes, target history and user-created food records have been deleted. Seed/reference catalog records and login configuration remain."});
+ return NextResponse.json({ok:true,message:"Personal meal logs, recipes, measurements, notes, target history and user-created food records have been deleted. Seed/reference catalog records and login configuration remain."});
 }
