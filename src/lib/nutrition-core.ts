@@ -12,7 +12,7 @@ export function aggregateIntake(items:IntakeItem[],definitions:NutrientDefinitio
   const result:Record<string,NutrientAggregate>={};
   for(const n of definitions){if(n.qualitative)continue;let amount=0,unknownCount=0;
     for(const item of items){const v=item.nutrients[n.key];if(typeof v==="number"&&Number.isFinite(v))amount+=v;else unknownCount++;}
-    result[n.key]={amount,complete:unknownCount===0,unknownCount,itemCount:items.length};
+    result[n.key]={amount,complete:items.length>0&&unknownCount===0,unknownCount,itemCount:items.length};
   }return result;
 }
 export function getRemaining(target:number|null|undefined,intake:number|null|undefined):number|null {
