@@ -55,7 +55,8 @@ for(const record of bundle.records){
  seen.add(record.id);
  for(const [key,value] of Object.entries(record.nutrients)){
   const definition=NUTRIENT_BY_KEY[key];
-  if(definition&&!definition.qualitative&&value.canonicalUnit!==definition.canonicalUnit){
+  if(!definition){console.error("Unsupported nutrient key for "+record.id+": "+key+". Add it to src/lib/nutrients.ts before importing.");process.exit(2);}
+  if(!definition.qualitative&&value.canonicalUnit!==definition.canonicalUnit){
    console.error("Canonical unit mismatch for "+record.id+" / "+key+": expected "+definition.canonicalUnit+", got "+value.canonicalUnit);
    process.exit(2);
   }
