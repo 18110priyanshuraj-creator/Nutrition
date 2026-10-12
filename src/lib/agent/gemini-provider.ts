@@ -1,5 +1,3 @@
-import type {ProcessEnv} from "node:process";
-
 export type GeminiErrorCategory = "missing_key" | "timeout" | "network" | "rate_limit" | "invalid_key" | "permission" | "project_quota" | "model_not_found" | "invalid_request" | "unknown";
 export interface GeminiKeySlot { label: string; apiKey: string }
 export interface GeminiSlotStatus {
@@ -37,7 +35,7 @@ function intFromEnv(value: string | undefined, fallback: number, min: number, ma
   return Number.isInteger(parsed) ? Math.max(min, Math.min(max, parsed)) : fallback;
 }
 /** Reads server-only keys. Never return, log, or persist their values from a status response. */
-export function configuredGeminiKeys(env: ProcessEnv = process.env): GeminiKeySlot[] {
+export function configuredGeminiKeys(env: Record<string, string | undefined> = process.env): GeminiKeySlot[] {
   const slots: GeminiKeySlot[] = [];
   for (let index = 1; index <= 4; index += 1) {
     const apiKey = env["GEMINI_API_KEY_" + index]?.trim();
@@ -46,7 +44,7 @@ export function configuredGeminiKeys(env: ProcessEnv = process.env): GeminiKeySl
   if (slots.length === 0 && env.GEMINI_API_KEY?.trim()) slots.push({label: "Legacy fallback", apiKey: env.GEMINI_API_KEY.trim()});
   return slots;
 }
-export function hasGeminiKey(env: ProcessEnv = process.env): boolean {
+export function hasGeminiKey(env: Record<string, string | undefined> = process.env): boolean {
   return configuredGeminiKeys(env).length > 0;
 }
 function errorFacts(error: unknown): {message: string; status: number | null; code: string} {
@@ -145,7 +143,7 @@ export async function withGeminiKeyFailover<T>(
   }
   throw new GeminiFailoverError("Gemini request failed after trying " + tried.length + " key slot(s). Category: " + finalCategory + ".", finalCategory, tried, retryAfter);
 }
-export function getGeminiProviderStatus(env: ProcessEnv = process.env) {
+export function getGeminiProviderStatus(env: Record<string, string | undefined> = process.env) {
   const keys = configuredGeminiKeys(env);
   const labels = ["Slot 1", "Slot 2", "Slot 3", "Slot 4"];
   if (keys.some((item) => item.label === "Legacy fallback")) labels.push("Legacy fallback");
