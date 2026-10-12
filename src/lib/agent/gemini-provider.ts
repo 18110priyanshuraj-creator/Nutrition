@@ -1,5 +1,3 @@
-import type {ProcessEnv} from "node:process";
-
 export type GeminiErrorCategory =
   | "missing_key" | "timeout" | "network" | "rate_limit" | "invalid_key"
   | "permission" | "project_quota" | "model_not_found" | "invalid_request" | "unknown";
@@ -41,7 +39,7 @@ function boundedInteger(value: string | undefined, fallback: number, min: number
 }
 
 /** Reads server-side environment variables only. Raw key values are never returned by status APIs. */
-export function configuredGeminiKeys(env: ProcessEnv = process.env): GeminiKeySlot[] {
+export function configuredGeminiKeys(env: NodeJS.ProcessEnv = process.env): GeminiKeySlot[] {
   const slots: GeminiKeySlot[] = [];
   for (let index = 1; index <= 4; index += 1) {
     const apiKey = env["GEMINI_API_KEY_" + index]?.trim();
@@ -52,7 +50,7 @@ export function configuredGeminiKeys(env: ProcessEnv = process.env): GeminiKeySl
   }
   return slots;
 }
-export function hasGeminiKey(env: ProcessEnv = process.env): boolean {
+export function hasGeminiKey(env: NodeJS.ProcessEnv = process.env): boolean {
   return configuredGeminiKeys(env).length > 0;
 }
 function errorFacts(error: unknown): {message: string; status: number | null; code: string} {
@@ -168,7 +166,7 @@ export async function withGeminiKeyFailover<T>(
     lastCategory, attemptedSlots, lastRetryAfter,
   );
 }
-export function getGeminiProviderStatus(env: ProcessEnv = process.env): {
+export function getGeminiProviderStatus(env: NodeJS.ProcessEnv = process.env): {
   provider: "Google Gemini";
   configured: boolean;
   modelConfigured: boolean;
