@@ -45,7 +45,7 @@ export async function POST(request:NextRequest){
   const form=await request.formData().catch(()=>null);const file=form?.get("image");
   text=String(form?.get("description")||"").slice(0,3000);
   if(!(file instanceof File)||file.size===0)return NextResponse.json({error:"Choose a food photo first."},{status:400});
-  const maxMb=Math.max(1,Math.min(12,Number(process.env.GEMINI_MAX_IMAGE_MB||8)));
+  const configuredMaxMb=Number(process.env.GEMINI_MAX_IMAGE_MB??8);const maxMb=Number.isFinite(configuredMaxMb)&&configuredMaxMb>0?Math.max(1,Math.min(12,configuredMaxMb)):8;
   if(file.size>maxMb*1024*1024)return NextResponse.json({error:"Image is too large. Maximum size is "+maxMb+" MB."},{status:413});
   const bytes=new Uint8Array(await file.arrayBuffer());const mimeType=detectMime(bytes);
   if(!mimeType)return NextResponse.json({error:"Unsupported or invalid image content. Use a real JPEG, PNG, or WebP image."},{status:415});

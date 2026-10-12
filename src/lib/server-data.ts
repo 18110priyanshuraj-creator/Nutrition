@@ -17,11 +17,11 @@ export function foodList(search=""):Record<string,unknown>[] {
  const rows=db.prepare("SELECT * FROM foods ORDER BY name").all() as Record<string,unknown>[];
  const q=search.trim().toLocaleLowerCase();
  return rows.filter((row)=>{
-  const aliases=readJson<string[]>(String(row.aliases_json),"[]");
+  const aliases=readJson<string[]>(String(row.aliases_json),[]);
   return !q||String(row.name).toLocaleLowerCase().includes(q)||aliases.some((a)=>a.toLocaleLowerCase().includes(q));
  }).map((row)=>({
   id:row.id,name:row.name,aliases:readJson<string[]>(String(row.aliases_json),"[]"),preparation:row.preparation,
-  nutrients:readJson<Record<string,number>>(String(row.nutrients_json),{}),servings:readJson<unknown[]>(String(row.servings_json),"[]"),
+  nutrients:readJson<Record<string,number>>(String(row.nutrients_json),{}),servings:readJson<unknown[]>(String(row.servings_json),[]),
   source:row.source,sourceVersion:row.source_version,confidence:row.confidence,completeness:row.completeness,sourceUrl:row.source_url??null,sourceRecordId:row.source_record_id??null,sourceBasis:row.source_basis??null,lastVerifiedAt:row.last_verified_at??null,sourceLicenseNote:row.source_license_note??null,nutrientProvenance:readJson<Record<string,unknown>>(String(row.nutrient_provenance_json??"{}"),{})
  }));
 }
@@ -61,6 +61,6 @@ export function dashboardForDate(date:string):Record<string,unknown> {
  const missingEntries=items.filter((item)=>item.portionEstimated).length;
  return {date,profile,targets,definitions:NUTRIENTS,meals,totals:aggregates,recommendations,
   logSummary:{mealCount:meals.length,itemCount:items.length,portionEstimates:missingEntries,hasAnyRecords:meals.length>0},
-  targetConsistency:{macroImpliedKcal:2195,calorieTargetKcal:targets.kcal?.target??2400,gapKcal:Number(targets.kcal?.target??2400)-2195},
+  targetConsistency:{macroImpliedKcal:Number(targets.protein_g?.target??0)*4+Number(targets.carbs_g?.target??0)*4+Number(targets.fat_g?.target??0)*9,calorieTargetKcal:targets.kcal?.target??2400,gapKcal:Number(targets.kcal?.target??2400)-(Number(targets.protein_g?.target??0)*4+Number(targets.carbs_g?.target??0)*4+Number(targets.fat_g?.target??0)*9)},
   catalog:{foodCount:foods.length,confidence:"provisional",notice:"Starter nutrition values are generic estimates, not verified IFCT rows."}};
 }

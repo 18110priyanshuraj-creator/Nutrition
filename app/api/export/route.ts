@@ -11,7 +11,7 @@ export async function GET(request:NextRequest){
  const profile=db.prepare("SELECT * FROM profiles WHERE id=1").get();
  const targets=db.prepare("SELECT * FROM nutrient_targets ORDER BY nutrient_key").all();
  const meals=db.prepare("SELECT * FROM meal_logs ORDER BY local_date,logged_at").all() as Record<string,unknown>[];
- const mealData=meals.map((meal)=>{
+ const mealData: Array<Record<string,unknown> & {items:Record<string,unknown>[]}> = meals.map((meal)=>{
   const items=db.prepare("SELECT * FROM meal_items WHERE meal_id=? ORDER BY created_at").all(meal.id) as Record<string,unknown>[];
   return {...meal,items:items.map((item)=>({...item,nutrients:readJson<Record<string,number>>(String(item.nutrients_json),{}),per100g:readJson<Record<string,number>>(String(item.per100g_snapshot_json),{})}))};
  });
