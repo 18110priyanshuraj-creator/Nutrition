@@ -1,9 +1,11 @@
+import {requireOwner} from "@/lib/server-auth";
 import {NextRequest,NextResponse} from "next/server";
 import {z} from "zod";
 import {getDb} from "@/lib/db";
 import {indiaDate,isDate} from "@/lib/server-data";
 export const runtime="nodejs";
 export async function GET(request:NextRequest){
+ const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
  const from=request.nextUrl.searchParams.get("from");const to=request.nextUrl.searchParams.get("to");
  const db=getDb();
  let rows:Record<string,unknown>[];
@@ -13,6 +15,7 @@ export async function GET(request:NextRequest){
 }
 const schema=z.object({kind:z.enum(["weight","height","water","sleep","exercise"]),value:z.number().finite().positive(),unit:z.string().min(1).max(20),activityType:z.string().max(80).optional(),note:z.string().max(500).optional(),localDate:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),recordedAt:z.string().datetime().optional()});
 export async function POST(request:NextRequest){
+ const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
  const parsed=schema.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return NextResponse.json({error:"Measurement details are invalid."},{status:400});
  const expected:Record<string,string>={weight:"kg",height:"cm",water:"L",sleep:"h",exercise:"min"};
