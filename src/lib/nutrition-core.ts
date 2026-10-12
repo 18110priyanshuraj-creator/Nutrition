@@ -46,7 +46,7 @@ export function parseKnownFoods(text:string,foods:FoodLike[]):ParsedCandidate[] 
   for(const food of sorted){const aliases=[food.name,...(food.aliases??[])].filter(Boolean).sort((a,b)=>b.length-a.length);
     for(const alias of aliases){const match=new RegExp("([0-9]+(?:[.,][0-9]+)?)?\\s*(kg|g|grams?|gm|ml|l|litres?|liters?|pieces?|pcs|katori|bowl|cup|glass|tbsp|tsp)?\\s*"+escapeRegex(alias.toLowerCase()),"i").exec(normalized);
       if(!match||used.has(food.id))continue;const amount=match[1]?Number(match[1].replace(",",".")):1;const unit=match[2]??"";
-      let converted:{grams:number;estimated:boolean};try{converted=unit?unitToGrams(amount,unit,food.name):{grams:food.name.toLowerCase().includes("banana")?118:food.name.toLowerCase().includes("roti")?40:100,estimated:true};}catch{converted={grams:100,estimated:true};}
+      let converted:{grams:number;estimated:boolean};try{const foodName=food.name.toLowerCase();const isCountFood=/banana|kela|egg|anda|roti|chapati|chapathi/.test(foodName);if(unit)converted=unitToGrams(amount,unit,food.name);else if(match[1]&&isCountFood)converted=unitToGrams(amount,"pieces",food.name);else if(match[1])converted={grams:amount,estimated:true};else converted={grams:foodName.includes("banana")?118:foodName.includes("roti")||foodName.includes("chapati")?40:100,estimated:true};}catch{converted={grams:100,estimated:true};}
       output.push({foodId:food.id,name:food.name,grams:Math.min(converted.grams,10000),estimated:converted.estimated||!match[1],confidence:match[1]?"medium":"low",note:"Local food-name match only; review food and portion before saving."});used.add(food.id);break;
     }
   }return output;

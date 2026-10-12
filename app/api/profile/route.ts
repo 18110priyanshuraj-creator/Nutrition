@@ -53,5 +53,5 @@ export async function PATCH(request:NextRequest){
   }
  });
  try{tx();}catch{return NextResponse.json({error:"Could not save profile or target settings."},{status:400});}
- return GET();
+ return GET(request);
 }
