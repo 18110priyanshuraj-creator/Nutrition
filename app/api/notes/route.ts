@@ -12,7 +12,7 @@ export async function GET(request:NextRequest){
  const notes=getDb().prepare("SELECT id,local_date,note,created_at,updated_at FROM daily_notes WHERE local_date=? ORDER BY created_at DESC").all(date);
  return NextResponse.json({date,notes},{headers:{"Cache-Control":"no-store"}});
 }
-const createSchema=z.object({localDate:z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/),note:z.string().trim().min(1).max(4000),idempotencyKey:z.string().uuid()});
+const createSchema=z.object({localDate:z.string().regex(/^\d{4}-\d{2}-\d{2}$/),note:z.string().trim().min(1).max(4000),idempotencyKey:z.string().uuid()});
 export async function POST(request:NextRequest){
  const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
  const parsed=createSchema.safeParse(await request.json().catch(()=>null));
