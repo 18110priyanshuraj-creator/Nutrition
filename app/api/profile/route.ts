@@ -1,10 +1,12 @@
+import {requireOwner} from "@/lib/server-auth";
 import {NextRequest,NextResponse} from "next/server";
 import {z} from "zod";
 import {getDb} from "@/lib/db";
 import {NUTRIENTS} from "@/lib/nutrients";
 import {indiaDate} from "@/lib/server-data";
 export const runtime="nodejs";
-export async function GET(){
+export async function GET(request:NextRequest){
+ const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
  const db=getDb();const profile=db.prepare("SELECT * FROM profiles WHERE id=1").get();
  const targets=db.prepare("SELECT * FROM nutrient_targets ORDER BY nutrient_key").all();
  return NextResponse.json({profile,targets});
@@ -24,6 +26,7 @@ const profileSchema=z.object({
 const targetSchema=z.object({key:z.string(),target:z.number().nonnegative().max(1e9).nullable(),min:z.number().nonnegative().nullable().optional(),max:z.number().nonnegative().nullable().optional()});
 const requestSchema=z.object({profile:profileSchema.optional(),targets:z.array(targetSchema).max(50).optional()});
 export async function PATCH(request:NextRequest){
+ const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
  const parsed=requestSchema.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return NextResponse.json({error:"Profile or target settings are invalid."},{status:400});
  const db=getDb();const now=new Date().toISOString();
