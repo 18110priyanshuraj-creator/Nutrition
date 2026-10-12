@@ -144,12 +144,13 @@ async function propose(task:string,root:string,diag:string,memory:Memory):Promis
   return parsed;
 }
 async function repair(root:string,task:string,baseline:Check[]):Promise<{ok:boolean;files:string[];summary:string}>{
-  let diag=failures(baseline);let previous="";let lastSummary="";const max=integer("AGENT_MAX_REPAIR_ATTEMPTS",3,1,3);
+  const changedPaths=[...git(root,["diff","--name-only"]).split("\n"),...git(root,["ls-files","--others","--exclude-standard"]).split("\n")].filter(Boolean);
+  let diag="Changed working-tree paths (some are protected from edits): "+changedPaths.join(", ")+"\n"+failures(baseline);let previous="";let lastSummary="";const max=integer("AGENT_MAX_REPAIR_ATTEMPTS",3,1,3);
   for(let attempt=1;attempt<=max;attempt++){
     console.log("\n===== AI repair "+attempt+"/"+max+" (same branch; no new branch) =====");
     const clean=cleanTracked(root);const memory=await loadMemory(root);
     const proposal=await propose(task,root,diag+"\n"+previous,memory);lastSummary=proposal.summary;
-    if(!proposal.files.length)return {ok:false,files:[],summary:lastSummary};
+    if(!proposal.files.length)return {ok:baseline.every(item=>item.ok),files:[],summary:lastSummary};
     const originals=new Map<string,string>();const proposed=new Map<string,string>();
     for(const item of proposal.files){
       if(!patchAllowed(item.path,clean))throw new Error("Safety guard rejected protected/modified path "+item.path+"; your existing edits were not changed.");
@@ -201,10 +202,23 @@ async function oneShot(root:string,command:"doctor"|"scan"):Promise<void>{
   const result=await checks(root);const ok=result.every(x=>x.ok);let memory=await loadMemory(root);
   await record(root,memory,{at:new Date().toISOString(),command,ok,summary:summary(result)});
   console.log("\nAgent report: "+summary(result));
-  if(!ok&&command==="scan"&&bool("AGENT_AUTO_FIX_SAFE_BUGS",true)){
-    const fixed=await repair(root,"",result);memory=await loadMemory(root);
-    await record(root,memory,{at:new Date().toISOString(),command:"scan-repair",ok:fixed.ok,summary:fixed.summary,files:fixed.files});
-    if(!fixed.ok)process.exitCode=1;
+  if(command==="scan"&&bool("AGENT_AUTO_FIX_SAFE_BUGS",true)){
+    const aiReady=configuredGeminiKeys().length>0&&Boolean(process.env.GEMINI_MODEL?.trim());
+    if(aiReady||!ok){
+      try{
+        const taskText=ok
+          ?"Proactively audit the changed application for concrete functional bugs, broken edge cases, incorrect error handling, and missing validation. If tests pass but a real defect is visible, make the smallest safe fix. Do not refactor or make stylistic changes. If no concrete issue is supported by source evidence, return no files."
+          :"Repair the failing checks using the smallest safe patch.";
+        const fixed=await repair(root,taskText,result);memory=await loadMemory(root);
+        await record(root,memory,{at:new Date().toISOString(),command:"scan-audit-repair",ok:fixed.ok,summary:fixed.summary,files:fixed.files});
+        if(!fixed.ok)process.exitCode=1;
+      }catch(error){
+        memory=await loadMemory(root);
+        await record(root,memory,{at:new Date().toISOString(),command:"scan-audit-repair",ok:false,summary:"Stopped safely: "+redact(String(error instanceof Error?error.message:error)).slice(0,300)});
+        console.error("AI scan did not finish: "+redact(String(error instanceof Error?error.message:error)).slice(0,500));
+        if(!ok)process.exitCode=1;
+      }
+    }else console.log("Gemini keys/model not configured; checks finished but AI audit was skipped.");
   }else if(!ok)process.exitCode=1;
 }
 async function taskRun(root:string,requested:string):Promise<void>{
@@ -223,14 +237,19 @@ async function watch(root:string):Promise<void>{
     else if(bool("AGENT_AUTO_SCAN",true)){
       const result=await checks(root);const ok=result.every(x=>x.ok);
       await record(root,memory,{at:new Date().toISOString(),command:"watch-scan",ok,summary:summary(result)});
-      if(!ok&&bool("AGENT_AUTO_FIX_SAFE_BUGS",true)&&memory.watch?.lastRepairFingerprint!==current){
+      const aiReady=configuredGeminiKeys().length>0&&Boolean(process.env.GEMINI_MODEL?.trim());
+      const shouldRepair=bool("AGENT_AUTO_FIX_SAFE_BUGS",true)&&memory.watch?.lastRepairFingerprint!==current&&(!ok||aiReady);
+      if(shouldRepair){
         try{
-          const fixed=await repair(root,"",result);memory=await loadMemory(root);
-          await record(root,memory,{at:new Date().toISOString(),command:"watch-repair",ok:fixed.ok,summary:fixed.summary,files:fixed.files});
+          const taskText=ok
+            ?"Audit recently changed files for concrete, demonstrable functional bugs and repair one only if evidence supports it. Do not refactor for style; return no files when no real bug is found."
+            :"Repair failing checks using the smallest safe patch.";
+          const fixed=await repair(root,taskText,result);memory=await loadMemory(root);
+          await record(root,memory,{at:new Date().toISOString(),command:"watch-audit-repair",ok:fixed.ok,summary:fixed.summary,files:fixed.files});
         }catch(error){
           memory=await loadMemory(root);
-          await record(root,memory,{at:new Date().toISOString(),command:"watch-repair",ok:false,summary:"Repair safely stopped: "+redact(String(error instanceof Error?error.message:error)).slice(0,300)});
-          console.error("Repair safely stopped; background monitor will continue.");
+          await record(root,memory,{at:new Date().toISOString(),command:"watch-audit-repair",ok:false,summary:"Stopped safely: "+redact(String(error instanceof Error?error.message:error)).slice(0,300)});
+          console.error("AI repair safely stopped; background monitor will continue.");
         }
         memory=await loadMemory(root);
         memory.watch={fingerprint:fingerprint(root),scannedAt:new Date().toISOString(),lastRepairFingerprint:current};
