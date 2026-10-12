@@ -1,3 +1,4 @@
+import {requireOwner} from "@/lib/server-auth";
 import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
 export const runtime = "nodejs";
