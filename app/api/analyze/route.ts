@@ -27,7 +27,7 @@ function safeGeminiError(error:unknown):{status:number;message:string}{
  const category=classifyGeminiError(error);
  if(category==="invalid_key"||category==="permission")return {status:502,message:"Gemini credentials or project permissions failed for the available key slots. Check server-side configuration."};
  if(category==="project_quota")return {status:503,message:"Gemini project-wide quota or billing limit was reached; key rotation cannot resolve it."};
- if(category==="rate_limit")return {status:503,message:"All available Gemini key slots are rate-limited or cooling down. Try later or use manual logging."};
+ if(category==="rate_limit")return {status:503,message:"All available Gemini key slots are rate-limited or cooling down. Keys from the same project share quotas; try later or use manual food entry."};
  if(category==="timeout"||category==="network")return {status:504,message:"Gemini request timed out or failed temporarily across available key slots. Retry or use manual food entry."};
  if(category==="model_not_found")return {status:503,message:"The configured Gemini model is unavailable. Check GEMINI_MODEL and project access."};
  if(category==="invalid_request")return {status:400,message:"Gemini rejected the request configuration. Check the model and request parameters."};
