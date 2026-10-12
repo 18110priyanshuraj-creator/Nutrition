@@ -47,6 +47,8 @@ export async function PATCH(request:NextRequest){
     if(!valid.has(target.key))throw new Error("Unknown nutrient target.");
     const d=NUTRIENTS.find((n)=>n.key===target.key)!;
     if(d.qualitative&&target.target!==null)throw new Error("Qualitative nutrient proxies cannot have numeric targets.");
+    const previous=db.prepare("SELECT target,target_min,target_max FROM nutrient_targets WHERE nutrient_key=?").get(target.key) as {target:number|null;target_min:number|null;target_max:number|null}|undefined;
+    if(previous&&(previous.target!==target.target||(previous.target_min??null)!==(target.min??null)||(previous.target_max??null)!==(target.max??null)))db.prepare("INSERT INTO nutrient_target_history(id,nutrient_key,previous_target,next_target,previous_min,next_min,previous_max,next_max,unit,changed_at,change_source) VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(crypto.randomUUID(),target.key,previous.target,target.target,previous.target_min??null,target.min??null,previous.target_max??null,target.max??null,d.canonicalUnit,now,"settings");
     db.prepare("INSERT INTO nutrient_targets(nutrient_key,target,target_min,target_max,unit,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(nutrient_key) DO UPDATE SET target=excluded.target,target_min=excluded.target_min,target_max=excluded.target_max,unit=excluded.unit,updated_at=excluded.updated_at")
       .run(target.key,target.target,target.min??null,target.max??null,d.canonicalUnit,now);
    }

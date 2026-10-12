@@ -22,7 +22,7 @@ export function foodList(search=""):Record<string,unknown>[] {
  }).map((row)=>({
   id:row.id,name:row.name,aliases:readJson<string[]>(String(row.aliases_json),"[]"),preparation:row.preparation,
   nutrients:readJson<Record<string,number>>(String(row.nutrients_json),{}),servings:readJson<unknown[]>(String(row.servings_json),"[]"),
-  source:row.source,sourceVersion:row.source_version,confidence:row.confidence,completeness:row.completeness
+  source:row.source,sourceVersion:row.source_version,confidence:row.confidence,completeness:row.completeness,sourceUrl:row.source_url??null,sourceRecordId:row.source_record_id??null,sourceBasis:row.source_basis??null,lastVerifiedAt:row.last_verified_at??null,sourceLicenseNote:row.source_license_note??null,nutrientProvenance:readJson<Record<string,unknown>>(String(row.nutrient_provenance_json??"{}"),{})
  }));
 }
 export function mealsForDate(date:string):Record<string,unknown>[] {
