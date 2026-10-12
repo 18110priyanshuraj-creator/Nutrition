@@ -63,6 +63,14 @@ describe("Gemini key failover", () => {
     }, {keys, cooldownMs: 1000, now: () => 1_800_000_000_000})).rejects.toMatchObject({category: "model_not_found"});
     expect(tried).toEqual(["Slot 1"]);
   });
+  it("does not rotate keys for an explicit project-wide quota error", async () => {
+    const tried: string[] = [];
+    await expect(withGeminiKeyFailover(async (_key, slot) => {
+      tried.push(slot);
+      throw new Error("project-wide quota exceeded");
+    }, {keys, cooldownMs: 1000, now: () => 1_800_000_000_000})).rejects.toMatchObject({category: "project_quota"});
+    expect(tried).toEqual(["Slot 1"]);
+  });
   it("reports missing key configuration", async () => {
     await expect(withGeminiKeyFailover(async () => "unused", {keys: []})).rejects.toMatchObject({category: "missing_key"});
   });
