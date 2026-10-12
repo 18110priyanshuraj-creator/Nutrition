@@ -1,14 +1,17 @@
+import {requireOwner} from "@/lib/server-auth";
 import {NextRequest,NextResponse} from "next/server";
 import {z} from "zod";
 import {getDb} from "@/lib/db";
 import {foodList} from "@/lib/server-data";
 export const runtime="nodejs";
 export async function GET(request:NextRequest){
+ const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
  const q=(request.nextUrl.searchParams.get("q")||"").slice(0,100);
  return NextResponse.json({foods:foodList(q)});
 }
 const customFoodSchema=z.object({name:z.string().trim().min(2).max(100),aliases:z.array(z.string().trim().min(1).max(60)).max(30).default([]),preparation:z.string().max(250).default("user-entered"),per100g:z.record(z.string(),z.number().finite().nonnegative().max(100000)),sourceNote:z.string().trim().min(3).max(300)});
 export async function POST(request:NextRequest){
+ const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
  const parsed=customFoodSchema.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return NextResponse.json({error:"Food name, source note, and valid per-100 g values are required."},{status:400});
  const db=getDb();const id="custom-"+crypto.randomUUID();const now=new Date().toISOString();
