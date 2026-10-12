@@ -38,7 +38,7 @@ export async function POST(request:Request){
     const message=category==="project_quota"
       ?"Gemini project-wide quota/billing limit reached; key rotation cannot resolve this."
       :category==="rate_limit"
-        ?"All available Gemini key slots are rate-limited or cooling down."
+        ?"All available Gemini key slots are rate-limited or cooling down. Keys from the same project share quotas."
         :category==="timeout"||category==="network"
           ?"All available Gemini key attempts failed temporarily."
           :category==="model_not_found"
