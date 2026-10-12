@@ -2,7 +2,8 @@ import {requireOwner} from "@/lib/server-auth";
 import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
 export const runtime = "nodejs";
-export async function GET() {
+export async function GET(request:Request) {
+  const unauthorized = await requireOwner(request); if (unauthorized) return unauthorized;
   const configured = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_MODEL);
   return NextResponse.json({
     provider: "Google Gemini", configured,
@@ -12,7 +13,8 @@ export async function GET() {
       "Set GEMINI_API_KEY and GEMINI_MODEL in the server environment. Secret values are never returned."
   });
 }
-export async function POST() {
+export async function POST(request:Request) {
+  const unauthorized = await requireOwner(request); if (unauthorized) return unauthorized;
   const key = process.env.GEMINI_API_KEY, model = process.env.GEMINI_MODEL;
   if (!key || !model) return NextResponse.json({ ok: false, error: "GEMINI_API_KEY and GEMINI_MODEL must both be configured." }, { status: 503 });
   try {

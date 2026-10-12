@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Leaf, LoaderCircle, ShieldCheck } from "lucide-react";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -15,7 +17,7 @@ export default function LoginPage() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Unable to sign in.");
-      window.location.href = "/";
+      router.replace("/"); router.refresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to sign in.");
     } finally { setBusy(false); }
