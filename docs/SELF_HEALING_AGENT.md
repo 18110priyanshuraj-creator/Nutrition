@@ -14,7 +14,7 @@ This is a guarded maintenance CLI added to the existing MyNutri app. It uses the
 - \`npm run agent -- memory\` — view local run summaries and verified lessons.
 - \`npm run agent -- memory clear\` — clear only the local agent memory.
 
-The background watcher runs only while its process/Codespace remains alive. It skips checks when the repository fingerprint has not changed. A scheduled GitHub Actions workflow is separate from this local monitor.
+The background watcher runs only while its process/Codespace remains alive. It skips expensive checks/audits when the repository fingerprint has not changed. On each source change, it runs checks and, when Gemini is configured, a cautious AI bug audit. A scheduled GitHub Actions workflow is separate from this local monitor.
 
 ## Four-key Gemini failover
 
