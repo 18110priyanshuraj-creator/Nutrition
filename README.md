@@ -26,6 +26,18 @@ Set GEMINI_API_KEY and GEMINI_MODEL on the server to enable live AI proposals. T
 
 SQLite suits one personal instance. In production, mount a persistent disk and set DATABASE_PATH to a path on it; ephemeral container filesystems are not durable. Back up using a SQLite-consistent backup method. Do not scale this SQLite deployment horizontally. Before multi-instance hosting, migrate to a managed database and private object storage. The Docker Compose volume persists the database between container restarts. This commit does not deploy a live service.
 
+## Self-healing repository agent
+
+A guarded local maintenance CLI can run the project's lint, typecheck, test and production-build checks, attempt bounded Gemini-generated fixes on the **current branch**, verify every change, and save lessons only from passing repairs.
+
+- Run `npm run agent -- doctor` for checks only.
+- Run `npm run agent -- scan` to check and attempt safe fixes.
+- Run `npm run agent -- "describe a focused task"` to request a code change.
+- Run `npm run agent:watch` to monitor changes while the Codespace process remains alive.
+- Run `npm run agent -- status` to inspect redacted four-slot Gemini failover status.
+
+Set `GEMINI_MODEL` and `GEMINI_API_KEY_1` through `GEMINI_API_KEY_4` in the private server environment. The legacy `GEMINI_API_KEY` remains supported when numbered slots are absent. The agent does not create branches, commit, push or merge; uncommitted files and protected auth/database paths are excluded from automatic edits. See [the agent guide](docs/SELF_HEALING_AGENT.md) for limits and safety details.
+
 ## Checks
 
 Run npm test, npm run lint, npm run typecheck, and npm run build. Automated tests do not require Gemini credentials. A passing build does not verify the live API or a production deployment.
