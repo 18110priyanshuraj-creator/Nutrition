@@ -10,7 +10,7 @@ const patchSchema=z.object({itemId:z.string().min(1).max(100).optional(),grams:z
 export async function PATCH(request:NextRequest,context:Context){
  const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
  const {id}=await context.params;const parsed=patchSchema.safeParse(await request.json().catch(()=>null));
- if(!parsed.success||(!parsed.data.itemId&&!parsed.data.mealType)||(parsed.data.itemId&&parsed.data.grams===undefined&&parsed.data.foodId===undefined&&!parsed.data.mealType))return NextResponse.json({error:"Provide a food identity, item portion or meal category to update."},{status:400});
+ if(!parsed.success||(!parsed.data.itemId&&!parsed.data.mealType)||(parsed.data.itemId&&parsed.data.grams===undefined&&parsed.data.foodId===undefined))return NextResponse.json({error:"Provide a food identity, item portion or meal category to update."},{status:400});
  const db=getDb();const meal=db.prepare("SELECT * FROM meal_logs WHERE id=?").get(id) as Record<string,unknown>|undefined;
  if(!meal)return NextResponse.json({error:"Meal not found."},{status:404});
  try{
@@ -24,9 +24,10 @@ export async function PATCH(request:NextRequest,context:Context){
     const grams=parsed.data.grams??Number(item.grams);
     const per100=food?JSON.parse(String(food.nutrients_json)) as Record<string,number>:JSON.parse(String(item.per100g_snapshot_json)) as Record<string,number>;
     const totals=calculateNutrients(per100,grams);
-    if(food)db.prepare("UPDATE meal_items SET food_id=?,food_name=?,grams=?,nutrients_json=?,per100g_snapshot_json=?,source_snapshot=?,confidence_snapshot=? WHERE id=?")
-      .run(food.id,food.name,grams,JSON.stringify(totals),JSON.stringify(per100),food.source,food.confidence,parsed.data.itemId);
-    else db.prepare("UPDATE meal_items SET grams=?,nutrients_json=?,portion_estimated=1 WHERE id=?").run(grams,JSON.stringify(totals),parsed.data.itemId);
+    const portionEstimated=parsed.data.grams!==undefined&&parsed.data.grams!==Number(item.grams)?0:Number(item.portion_estimated??0);
+    if(food)db.prepare("UPDATE meal_items SET food_id=?,food_name=?,grams=?,nutrients_json=?,per100g_snapshot_json=?,source_snapshot=?,confidence_snapshot=?,portion_estimated=? WHERE id=?")
+      .run(food.id,food.name,grams,JSON.stringify(totals),JSON.stringify(per100),food.source,food.confidence,portionEstimated,parsed.data.itemId);
+    else db.prepare("UPDATE meal_items SET grams=?,nutrients_json=?,portion_estimated=? WHERE id=?").run(grams,JSON.stringify(totals),portionEstimated,parsed.data.itemId);
    }
   });tx();
  }catch(error){if(error instanceof Error&&error.message==="ITEM_NOT_FOUND")return NextResponse.json({error:"Meal item not found."},{status:404});if(error instanceof Error&&error.message==="FOOD_NOT_FOUND")return NextResponse.json({error:"Selected food was not found. Refresh the catalog."},{status:404});return NextResponse.json({error:"Could not update meal."},{status:400});}

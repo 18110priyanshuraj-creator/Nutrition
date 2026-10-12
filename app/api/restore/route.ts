@@ -49,6 +49,13 @@ export async function POST(request:NextRequest){
  const db=getDb();
  const counts=db.prepare("SELECT (SELECT COUNT(*) FROM meal_logs) AS meals,(SELECT COUNT(*) FROM measurements) AS measurements,(SELECT COUNT(*) FROM daily_notes) AS notes,(SELECT COUNT(*) FROM nutrient_target_history) AS history,(SELECT COUNT(*) FROM recipes) AS recipes,(SELECT COUNT(*) FROM foods WHERE confidence='user') AS customFoods").get() as Record<string,number>;
  if(Object.values(counts).some(Number))return NextResponse.json({error:"Restore requires an empty personal-data store, including recipes and user-created foods. Export current data first and use a separate empty database to avoid overwrites."},{status:409});
+ const currentProfile=db.prepare("SELECT display_name,age,sex,height_cm,weight_kg,country,diet_preference,region,exercise_frequency,exercise_time,timezone,units FROM profiles WHERE id=1").get() as Record<string,unknown>;
+ const defaultProfile:Record<string,unknown>={display_name:"My profile",age:17,sex:"male",height_cm:160,weight_kg:47,country:"India",diet_preference:"vegetarian",region:"Indian home-cooked",exercise_frequency:"4–5 days/week",exercise_time:"Morning",timezone:"Asia/Kolkata",units:"metric"};
+ const profileWasChanged=Object.entries(defaultProfile).some(([key,value])=>currentProfile?.[key]!==value);
+ const currentTargetRows=db.prepare("SELECT nutrient_key,target,target_min,target_max FROM nutrient_targets").all() as Array<{nutrient_key:string;target:number|null;target_min:number|null;target_max:number|null}>;
+ const currentTargets=new Map(currentTargetRows.map(row=>[row.nutrient_key,row]));
+ const targetsWereChanged=currentTargetRows.length!==NUTRIENTS.length||NUTRIENTS.some(n=>{const row=currentTargets.get(n.key);return !row||(row.target===null?null:Number(row.target))!==n.target||(row.target_min===null?null:Number(row.target_min))!==(n.targetMin??null)||(row.target_max===null?null:Number(row.target_max))!==(n.targetMax??null);});
+ if(profileWasChanged||targetsWereChanged)return NextResponse.json({error:"Restore would overwrite customized profile or target settings. Reset the personal-data store or use a separate empty database before restoring."},{status:409});
  for(const food of p.customFoods){if(db.prepare("SELECT id FROM foods WHERE id=?").get(food.id))return NextResponse.json({error:"A custom food ID collides with the base catalog. Resolve the ID before restoring."},{status:409});}
  const profile=p.profile??{};
  const stringField=(key:string,fallback:string,maxLength:number)=>{const value=profile[key];return typeof value==="string"&&value.length<=maxLength?value:fallback;};

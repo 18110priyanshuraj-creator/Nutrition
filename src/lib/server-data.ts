@@ -52,8 +52,14 @@ export function dashboardForDate(date:string):Record<string,unknown> {
  for(const key of ["protein_g","calcium_mg","iron_mg","vit_c_mg","omega3_g","vit_b12_ug","magnesium_mg"]){
   const n=aggregates[key];const target=targets[key]?.target;
   if(!n||!n.complete||typeof target!=="number"||n.amount>=target)continue;
+  const diet=String(profile.diet_preference??"vegetarian");
+  const nonVeg=["Chicken, cooked"];
+  const eggFoods=["Egg, hard-boiled"];
+  const dairyFoods=["Cow milk, toned","Plain curd","Paneer, plain"];
   const ranked=foods.filter((f)=>f.confidence==="estimate"&&typeof (f.nutrients as Record<string,number>)[key]==="number")
-   .filter((f)=>profile.diet_preference!=="vegetarian"||!["Chicken, cooked","Egg, hard-boiled"].includes(String(f.name)))
+   .filter((f)=>diet!=="vegan"||!dairyFoods.includes(String(f.name))&&!eggFoods.includes(String(f.name))&&!nonVeg.includes(String(f.name)))
+   .filter((f)=>diet!=="vegetarian"||!eggFoods.includes(String(f.name))&&!nonVeg.includes(String(f.name)))
+   .filter((f)=>diet!=="eggetarian"||!nonVeg.includes(String(f.name)))
    .sort((a,b)=>Number((b.nutrients as Record<string,number>)[key])-Number((a.nutrients as Record<string,number>)[key]));
   const first=ranked[0];
   if(first)recommendations.push({nutrient:key,food:first.name,foodId:first.id,portionGrams:30,contribution:Number((first.nutrients as Record<string,number>)[key])*0.3,unit:NUTRIENTS.find((x)=>x.key===key)?.canonicalUnit,source:first.source,confidence:"estimate"});
