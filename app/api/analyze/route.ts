@@ -1,3 +1,4 @@
+import {requireOwner} from "@/lib/server-auth";
 import {GoogleGenAI} from "@google/genai";
 import {NextRequest,NextResponse} from "next/server";
 import {z} from "zod";
@@ -36,6 +37,7 @@ function detectMime(bytes:Uint8Array):string|null{
  return null;
 }
 export async function POST(request:NextRequest){
+ const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
  if(!rateLimit(request))return NextResponse.json({error:"Too many analysis requests. Wait a minute or use manual logging."},{status:429});
  const isMultipart=request.headers.get("content-type")?.includes("multipart/form-data")||false;
  let text="";let imageData:{mimeType:string;data:string}|null=null;
