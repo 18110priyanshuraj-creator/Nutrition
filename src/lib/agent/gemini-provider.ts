@@ -74,13 +74,13 @@ export function classifyGeminiError(error: unknown): GeminiErrorCategory {
   if (facts.status === 402 || /payment_required|prepay credit.{0,40}(depleted|empty)|billing.{0,30}(limit|quota|depleted)|project-wide quota|quota.{0,30}project|project.{0,30}quota/.test(message)) {
     return "project_quota";
   }
-  if (facts.status === 401 || /invalid[_ -]?api[_ -]?key|api[_ -]?key.{0,20}(invalid|not valid)|key.{0,15}(revoked|invalid)|unauthenticated|status.?401|\\b401\\b/.test(message)) {
+  if (facts.status === 401 || /invalid[_ -]?api[_ -]?key|api[_ -]?key.{0,20}(invalid|not valid)|key.{0,15}(revoked|invalid)|unauthenticated|status.?401|\b401\b/.test(message)) {
     return "invalid_key";
   }
   if (facts.status === 403 || /permission denied|permission_denied|forbidden|access denied/.test(message)) return "permission";
   if (facts.status === 404 || /model.{0,20}(not found|does not exist|unavailable)|not_found.*model/.test(message)) return "model_not_found";
   if (facts.status === 400 || /invalid_argument|invalid request|bad request|unsupported parameter/.test(message)) return "invalid_request";
-  if (facts.status === 429 || /rate.?limit|rate_limit_exceeded|quota_exceeded|resource_exhausted|quota exceeded|too many requests|\\b429\\b/.test(message)) return "rate_limit";
+  if (facts.status === 429 || /rate.?limit|rate_limit_exceeded|quota_exceeded|resource_exhausted|quota exceeded|too many requests|\b429\b/.test(message)) return "rate_limit";
   if (facts.status === 408 || facts.status === 504 || /timed? ?out|timeout|deadline exceeded|aborterror|aborted/.test(message)) return "timeout";
   if (facts.status === 500 || facts.status === 502 || facts.status === 503 || /econnreset|econnrefused|enotfound|eai_again|fetch failed|network error|socket hang up|temporary failure|service unavailable|server overloaded/.test(message)) return "network";
   return "unknown";

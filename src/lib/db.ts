@@ -27,7 +27,7 @@ const seedFoods = [
 export function getDb():DbInstance {
  if(database)return database;
  const configured=process.env.DATABASE_PATH||"./data/mynutri.sqlite";
- const filePath=resolve(configured);
+ const filePath=resolve(/*turbopackIgnore: true*/ configured);
  mkdirSync(dirname(filePath),{recursive:true});
  database=new Database(filePath);database.pragma("foreign_keys = ON");database.pragma("journal_mode = WAL");
  database.exec("CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");

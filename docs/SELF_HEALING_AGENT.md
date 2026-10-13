@@ -20,6 +20,8 @@ The background watcher runs only while its process/Codespace remains alive. It s
 
 ## Seven-slot Gemini failover
 
+For local configuration, use `npm run configure:local` in an interactive terminal. `npm run configure:local -- --status` prints only masked configured/empty status. The editor confirms before changing an existing `.env.local`, preserves unrelated settings, and refuses to write unless that file is Git-ignored. Secret input is masked as typed. Enter keeps a value; `-` removes only that key's local-file override. Process/Codespaces environment variables take precedence, so edit those private Secrets directly when they are the active source. No Gemini request is made by this setup command.
+
 Configure private server-side environment variables:
 
 - `GEMINI_API_KEY_1`
@@ -31,7 +33,7 @@ Configure private server-side environment variables:
 - `GEMINI_API_KEY_7`
 - `GEMINI_MODEL`
 
-The previous `GEMINI_API_KEY` variable remains a fallback when no numbered slot is set. Never commit secret values or expose them in logs.
+The previous `GEMINI_API_KEY` variable remains a fallback when no numbered slot is set. Never commit secret values or expose them in logs. Slot status reports only configured/empty state and sanitized runtime counters, never key values. The example model name is not proof of model availability. The optional preflight performs a real provider request and must only be run when you choose to spend API quota.
 
 Timeouts, network errors and key-specific credential errors rotate to another available slot. Rate-limit responses also try a bounded number of slots, but Gemini rate limits are project-scoped: keys from the same Google AI project share quotas, so rotation only helps when another slot has a usable independent project/quota. Explicit project-wide quota or billing errors, invalid models and invalid requests stop early. Cooldowns and the last successful slot are held in server-process memory and reset when the process restarts.
 

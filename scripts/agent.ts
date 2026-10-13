@@ -64,7 +64,9 @@ async function runCheck(root:string,name:string):Promise<Check>{
   const pkg=JSON.parse(readFileSync(join(root,"package.json"),"utf8")) as {scripts?:Record<string,string>};
   if(!pkg.scripts?.[name])return {name,ok:true,output:"Skipped: script not found.",durationMs:0};
   const result=await new Promise<{code:number|null;timedOut:boolean;output:string}>((resolve,reject)=>{
-    const child=spawn(process.platform==="win32"?"npm.cmd":"npm",["run",name],{cwd:root,env:process.env,shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"]});
+    const env={...process.env};
+    if(name==="build")env.NODE_ENV="production";
+    const child=spawn(process.platform==="win32"?"npm.cmd":"npm",["run",name],{cwd:root,env,shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"]});
     let output="";let timedOut=false;
     const append=(part:Buffer)=>{const text=redact(part.toString("utf8"));output=(output+text).slice(-14000);process.stdout.write(text);};
     child.stdout.on("data",append);child.stderr.on("data",append);child.once("error",reject);

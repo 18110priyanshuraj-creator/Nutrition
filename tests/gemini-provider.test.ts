@@ -11,6 +11,29 @@ import {
 afterEach(() => resetGeminiProviderStateForTests());
 
 describe("Gemini key configuration", () => {
+  it("discovers every numbered slot in order", () => {
+    const env = Object.fromEntries(
+      Array.from({length: 7}, (_, index) => [`GEMINI_API_KEY_${index + 1}`, `private-slot-${index + 1}`]),
+    );
+    expect(configuredGeminiKeys(env as unknown as NodeJS.ProcessEnv).map((slot) => slot.label)).toEqual([
+      "Slot 1", "Slot 2", "Slot 3", "Slot 4", "Slot 5", "Slot 6", "Slot 7",
+    ]);
+  });
+  it("discovers all seven numbered slots and skips empty values", () => {
+    const env = {
+      GEMINI_API_KEY_1: "secret-one",
+      GEMINI_API_KEY_2: "  ",
+      GEMINI_API_KEY_3: "secret-three",
+      GEMINI_API_KEY_4: "",
+      GEMINI_API_KEY_5: "secret-five",
+      GEMINI_API_KEY_6: undefined,
+      GEMINI_API_KEY_7: "secret-seven",
+      GEMINI_API_KEY: "legacy-secret",
+    };
+    expect(configuredGeminiKeys(env as unknown as NodeJS.ProcessEnv).map((slot) => slot.label)).toEqual([
+      "Slot 1", "Slot 3", "Slot 5", "Slot 7",
+    ]);
+  });
   it("uses numbered slots and never returns raw key values in status", () => {
     const env = {GEMINI_API_KEY_1: "secret-one", GEMINI_API_KEY_2: "secret-two", GEMINI_API_KEY_4: "secret-four", GEMINI_API_KEY: "legacy-secret"};
     expect(configuredGeminiKeys(env as unknown as NodeJS.ProcessEnv).map((slot) => slot.label)).toEqual(["Slot 1", "Slot 2", "Slot 4"]);
@@ -50,6 +73,10 @@ describe("Gemini failure classification", () => {
     expect(classifyGeminiError({status: 503, message: "service unavailable"})).toBe("network");
     expect(classifyGeminiError({status: 404, message: "model not found"})).toBe("model_not_found");
     expect(classifyGeminiError(new Error("project-wide quota exceeded"))).toBe("project_quota");
+    expect(classifyGeminiError(new Error("HTTP 401 unauthorized"))).toBe("invalid_key");
+    expect(classifyGeminiError(new Error("HTTP 429 rate limited"))).toBe("rate_limit");
+    expect(classifyGeminiError({status: 403, message: "permission denied"})).toBe("permission");
+    expect(classifyGeminiError({status: 503, message: "temporary network failure"})).toBe("network");
   });
 });
 describe("Gemini key failover", () => {
@@ -111,6 +138,28 @@ describe("Gemini key failover", () => {
       throw new Error("project-wide quota exceeded");
     }, {keys, cooldownMs: 1000, now: () => 1_800_000_000_000})).rejects.toMatchObject({category: "project_quota"});
     expect(tried).toEqual(["Slot 1"]);
+  });
+  it("places a failed slot in a bounded cooldown and does not retry it early", async () => {
+    let attempts = 0;
+    const options = {keys: [keys[0]], cooldownMs: 1000, now: () => 1_800_000_000_000, maxAttempts: 1};
+    await expect(withGeminiKeyFailover(async () => {
+      attempts += 1;
+      throw new Error("request timed out");
+    }, options)).rejects.toMatchObject({category: "timeout"});
+    await expect(withGeminiKeyFailover(async () => {
+      attempts += 1;
+      return "unexpected";
+    }, options)).rejects.toMatchObject({category: "rate_limit", retryAfterMs: 1000});
+    expect(attempts).toBe(1);
+  });
+  it("returns bounded generic errors without reflecting a rejected key", async () => {
+    const secretKey = "AIzaSyDUMMY0123456789abcdefghijklmnop";
+    const error = await withGeminiKeyFailover(async () => {
+      throw new Error("provider rejected " + secretKey);
+    }, {keys: [{label: "Slot 1", apiKey: secretKey}], cooldownMs: 1000, now: () => 1_800_000_000_000, maxAttempts: 1})
+      .catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).not.toContain(secretKey);
   });
   it("reports missing key configuration", async () => {
     await expect(withGeminiKeyFailover(async () => "unused", {keys: []})).rejects.toMatchObject({category: "missing_key"});

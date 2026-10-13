@@ -86,9 +86,11 @@ function run(command: string, args: string[], cwd: string, timeoutMs = 30000): {
   const runThroughNode = Boolean(npmCli && existsSync(npmCli));
   const executable = runThroughNode ? process.execPath : command;
   const executableArgs = runThroughNode ? [npmCli as string, ...args] : args;
+  const env = {...process.env};
+  if (command === "npm" && args[0] === "run" && args[1] === "build") env.NODE_ENV = "production";
   const result = spawnSync(executable, executableArgs, {
     cwd, encoding: "utf8", timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024,
-    windowsHide: true, shell: false, env: process.env,
+    windowsHide: true, shell: false, env,
   });
   return {status: result.status, stdout: redact(String(result.stdout || "")), stderr: redact(String(result.stderr || result.error?.message || ""))};
 }

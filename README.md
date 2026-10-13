@@ -11,16 +11,20 @@ The starter catalog intentionally contains a small set of provisional generic es
 - Node.js 22 or newer and npm
 - A unique APP_PASSWORD with at least 12 characters
 - A random SESSION_SECRET with at least 32 characters
-- GEMINI_API_KEY and GEMINI_MODEL only for live text/photo analysis
+- Gemini keys and GEMINI_MODEL only for live text/photo analysis
 
-1. Copy .env.example to .env and replace the security placeholders.
-2. Run npm install.
-3. Run npm run db:migrate.
-4. Run npm run dev and open port 3000.
-5. Sign in with APP_PASSWORD.
-6. Pick a food, edit the gram portion, and save. SQLite writes to data/mynutri.sqlite by default.
+1. Run `npm run configure:local` in an interactive terminal. It shows masked configuration status, asks before modifying an existing `.env.local`, updates selected values only, and preserves unrelated settings. It refuses to write unless Git confirms `.env.local` is ignored. Use Enter to keep a value and `-` to clear a local Gemini key/model override.
+2. Enter a private APP_PASSWORD of at least 12 characters when prompted. The tool creates a cryptographically random SESSION_SECRET if one is not already configured; its value is never displayed.
+3. Run `npm run db:migrate`.
+4. Run `npm run dev` and open `http://localhost:3000/login`.
+5. Sign in with the APP_PASSWORD configured in the effective server environment. There is no demo account or built-in default password.
+6. Pick a food, edit the gram portion, and save. SQLite writes to `data/mynutri.sqlite` by default.
 
-Set GEMINI_API_KEY and GEMINI_MODEL on the server to enable live AI proposals. The model is intentionally not hard-coded. If Gemini is unavailable, manual food selection and deterministic calculations still work.
+Use `npm run configure:local -- --status` to see which local settings are configured without revealing their values. In Codespaces, configure or replace production/development `APP_PASSWORD`, `SESSION_SECRET`, and Gemini keys through the repository or Codespace's private Secrets settings; injected process environment values take precedence over `.env.local`. Restart the server after changing local settings. To reset the owner password, replace APP_PASSWORD through the applicable private settings, then restart; existing session cookies remain protected by SESSION_SECRET.
+
+If you no longer know the configured password, it cannot be recovered from this app. Replace APP_PASSWORD with a new private value (at least 12 characters) in the environment source shown by the masked status tool, restart the server, then sign in at `http://localhost:3000/login` or use the browser URL shown for forwarded port 3000 in Codespaces. There is no demo account or built-in password reset endpoint.
+
+Set one or more of `GEMINI_API_KEY_1` through `GEMINI_API_KEY_7` and `GEMINI_MODEL` to enable live AI proposals. The model name is configurable but not validated by local setup; ensure your Google AI project supports it before enabling AI. Never run the agent preflight or test-request action unless you intend to make a live Gemini request. If Gemini is unavailable, manual food selection and deterministic calculations still work.
 
 ## Persistence and deployment
 
