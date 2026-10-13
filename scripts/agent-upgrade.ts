@@ -302,8 +302,14 @@ async function applyProposal(
       lastOwned.set(path, value);
       changed.add(path);
     }
-    const diffCheck = run("git", ["diff", "--check"], root);
-    if (diffCheck.status !== 0) throw new Error("Generated changes failed git diff --check: " + diffCheck.stderr);
+    const whitespacePath = [...changes.entries()].find(([, value]) => /[ \t]+(?:\r?\n|$)/.test(value));
+    if (whitespacePath) throw new Error("Generated content contains trailing whitespace: " + whitespacePath[0]);
+    const trackedPaths = new Set(git(root, ["ls-files"]).split("\n").filter(Boolean));
+    const trackedChanges = [...changes.keys()].filter((path) => trackedPaths.has(path));
+    if (trackedChanges.length) {
+      const diffCheck = run("git", ["diff", "--check", "--", ...trackedChanges], root);
+      if (diffCheck.status !== 0) throw new Error("Generated changes failed path-scoped git diff --check: " + diffCheck.stderr);
+    }
     return [...changes.keys()];
   } catch (error) {
     for (const [path, old] of [...before.entries()].reverse()) {
@@ -332,8 +338,8 @@ async function writeReport(root: string, report: Record<string, unknown>): Promi
 async function main(): Promise<void> {
   const root = rootDir();
   const requestedTask = process.argv.slice(2).join(" ").trim();
-  const task = requestedTask ||
-    "Upgrade this existing Gemini coding agent toward a reliable Copilot-style autonomous engineer: broader repository understanding, self-improvement of its own core, structured plans, safe multi-file changes, test-and-repair iterations, memory, progress reporting, robust Gemini failover, and meaningful tests. Fix evidenced high-priority bugs when appropriate.";
+  const task = redact(requestedTask ||
+    "Upgrade this existing Gemini coding agent toward a reliable Copilot-style autonomous engineer: broader repository understanding, self-improvement of its own core, structured plans, safe multi-file changes, test-and-repair iterations, memory, progress reporting, robust Gemini failover, and meaningful tests. Fix evidenced high-priority bugs when appropriate.");
   const maxRounds = integer("AGENT_UPGRADE_MAX_ROUNDS", 4, 1, 8);
   const statusAtStart = gitStatusPaths(root);
   const tracked = gitTracked(root);
