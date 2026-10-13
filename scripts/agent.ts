@@ -30,7 +30,7 @@ function integer(name: string, fallback: number, min: number, max: number): numb
   return Number.isInteger(value) ? Math.max(min, Math.min(max,value)) : fallback;
 }
 function redact(value: string): string {
-  return value.replace(/AIza[0-9A-Za-z_-]{20,}/g,"[REDACTED_KEY]")
+  return value.replace(/(?:AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,})/g,"[REDACTED_KEY]")
     .replace(/(GEMINI_API_KEY(?:_[1-4])?|SESSION_SECRET|APP_PASSWORD)\s*[:=]\s*[^\s"' \x60,]+/gi,"$1=[REDACTED]")
     .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,"[REDACTED_PRIVATE_KEY]");
 }
@@ -106,7 +106,7 @@ function patchAllowed(path:string,clean:Set<string>):boolean{
   if(/^app\/api\/(auth|restore)\//.test(path)||/^src\/lib\/agent\//.test(path)||path==="scripts/agent.ts")return false;
   return true;
 }
-function secretLike(text:string):boolean{return /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|AIza[0-9A-Za-z_-]{25,}|GOCSPX-[0-9A-Za-z_-]{18,}/.test(text);}
+function secretLike(text:string):boolean{return /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|(?:AIza[0-9A-Za-z_-]{25,}|AQ\.[0-9A-Za-z_-]{25,})|GOCSPX-[0-9A-Za-z_-]{18,}/.test(text);}
 function sourceContext(root:string,diag:string,memory:Memory):string{
   const paths=tracked(root).filter(contextAllowed);
   paths.sort((a,b)=>(diag.includes(a)?0:1)-(diag.includes(b)?0:1)||a.localeCompare(b));
