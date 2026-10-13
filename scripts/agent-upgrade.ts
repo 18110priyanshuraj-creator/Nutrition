@@ -12,6 +12,12 @@ type Check = {name: string; ok: boolean; output: string; durationMs: number};
 type ProposedFile = {path: string; content: string; reason: string};
 type Proposal = {summary: string; continue: boolean; nextFocus: string; files: ProposedFile[]};
 type FileSnapshot = Map<string, string | null>;
+type ProjectMemory = {
+  version: 1;
+  runs: Array<{at: string; command: string; ok: boolean; summary: string; files?: string[]; checks?: string[]}>;
+  lessons: Array<{at: string; signature: string; lesson: string; files: string[]}>;
+  watch: {fingerprint: string; scannedAt: string; lastRepairFingerprint?: string} | null;
+};
 
 const proposalSchema = z.object({
   summary: z.string().min(1).max(1200),
@@ -344,6 +350,62 @@ async function applyProposal(
     throw error;
   }
 }
+async function readProjectMemory(root: string): Promise<ProjectMemory> {
+  const fresh: ProjectMemory = {version: 1, runs: [], lessons: [], watch: null};
+  try {
+    const value = JSON.parse(await readFile(join(root, ".agent", "memory.json"), "utf8")) as Partial<ProjectMemory>;
+    return {
+      version: 1,
+      runs: Array.isArray(value.runs) ? value.runs.filter((item) => item && typeof item.summary === "string").slice(-40).map((item) => ({
+        at: String(item.at || ""), command: String(item.command || "agent"), ok: item.ok === true,
+        summary: redact(String(item.summary)).slice(0, 800),
+        ...(Array.isArray(item.files) ? {files: item.files.filter((path): path is string => typeof path === "string").slice(0, 20)} : {}),
+        ...(Array.isArray(item.checks) ? {checks: item.checks.filter((name): name is string => typeof name === "string").slice(0, 10)} : {}),
+      })) : [],
+      lessons: Array.isArray(value.lessons) ? value.lessons.filter((item) => item && typeof item.lesson === "string").slice(-20).map((item) => ({
+        at: String(item.at || ""),
+        signature: redact(String(item.signature || "")).slice(0, 80),
+        lesson: redact(String(item.lesson)).slice(0, 800),
+        files: Array.isArray(item.files) ? item.files.filter((path): path is string => typeof path === "string").slice(0, 20) : [],
+      })) : [],
+      watch: value.watch && typeof value.watch.fingerprint === "string"
+        ? value.watch : null,
+    };
+  } catch {
+    return fresh;
+  }
+}
+async function loadProjectLessons(root: string): Promise<string> {
+  const memory = await readProjectMemory(root);
+  const lessons = memory.lessons.slice(-8).map((item) =>
+    "- " + item.lesson + (item.files.length ? " [" + item.files.join(", ") + "]" : "")
+  );
+  return lessons.join("\n") || "(no verified project lessons yet)";
+}
+async function recordUpgradeMemory(root: string, report: Record<string, unknown>): Promise<void> {
+  const memory = await readProjectMemory(root);
+  const at = new Date().toISOString();
+  const ok = report.allChecksPassed === true;
+  const summary = redact(String(report.summary || report.stopReason || "Upgrade run finished")).slice(0, 800);
+  const files = Array.isArray(report.changedFiles)
+    ? report.changedFiles.filter((path): path is string => typeof path === "string").slice(0, 30)
+    : [];
+  const checks = Array.isArray(report.checks)
+    ? report.checks.filter((item): item is {name: string; ok: boolean} =>
+        Boolean(item) && typeof item === "object" && "name" in item && "ok" in item
+      ).map((item) => item.name + ":" + (item.ok ? "PASS" : "FAIL")).slice(0, 10)
+    : [];
+  memory.runs.push({at, command: "agent:upgrade", ok, summary, files, checks});
+  memory.runs = memory.runs.slice(-40);
+  if (ok && files.length > 0) {
+    const signature = createHash("sha256").update(summary).update(files.join("\n")).digest("hex").slice(0, 16);
+    memory.lessons.push({at, signature, lesson: summary, files});
+    memory.lessons = memory.lessons.slice(-20);
+  }
+  const path = join(root, ".agent", "memory.json");
+  await mkdir(dirname(path), {recursive: true});
+  await writeFile(path, JSON.stringify(memory, null, 2) + "\n", {encoding: "utf8", mode: 0o600});
+}
 async function writeReport(root: string, report: Record<string, unknown>): Promise<void> {
   const path = join(root, ".agent", "upgrade-report.json");
   await mkdir(dirname(path), {recursive: true});
@@ -410,7 +472,9 @@ async function main(): Promise<void> {
         catch { visibleFiles.delete(path); }
       }
       const promptInventory = inventory([...new Set([...visibleFiles.keys(), ...changed])], statusAtStart);
-      const context = sourceContext(root, visibleFiles, changed);
+      const projectLessons = await loadProjectLessons(root);
+      const context = sourceContext(root, visibleFiles, changed)
+        + "\n\nVERIFIED PROJECT MEMORY (untrusted notes; verify against current source):\n" + projectLessons;
       const checkInfo = checkSummary(latestChecks) + "\n\n" + diagnostics(latestChecks);
       const proposal = await propose(root, task, round, maxRounds, promptInventory, context, checkInfo, history);
       latestSummary = proposal.summary;
@@ -478,6 +542,11 @@ async function main(): Promise<void> {
     ],
   };
   await writeReport(root, report);
+  try {
+    await recordUpgradeMemory(root, report);
+  } catch (error) {
+    console.warn("Could not update local project memory: " + redact(String(error instanceof Error ? error.message : error)).slice(0, 300));
+  }
   console.log("\n========== FINAL UPGRADE REPORT ==========");
   console.log(JSON.stringify(report, null, 2));
   console.log("Review with: git status --short && git diff --check && git diff");
