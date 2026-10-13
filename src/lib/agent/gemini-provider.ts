@@ -116,7 +116,7 @@ export async function withGeminiKeyFailover<T>(
   const cooldownMs = Math.max(1000, Math.min(15 * 60_000, options.cooldownMs ?? boundedInteger(
     process.env.GEMINI_KEY_COOLDOWN_MS, 60_000, 1000, 15 * 60_000,
   )));
-  const retries = boundedInteger(process.env.GEMINI_MAX_RETRIES, 3, 0, 3);
+  const retries = boundedInteger(process.env.GEMINI_MAX_RETRIES, 6, 0, 6);
   const maxAttempts = Math.max(1, Math.min(keys.length, options.maxAttempts ?? retries + 1));
   const start = rotationCursor % keys.length;
   const rotated = [...keys.slice(start), ...keys.slice(0, start)];
