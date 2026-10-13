@@ -109,10 +109,11 @@ function hasSymlinkAncestor(root: string, path: string): boolean {
   let current = root;
   for (const part of path.split("/")) {
     current = join(current, part);
-    if (!existsSync(current)) continue;
     try {
       if (lstatSync(current).isSymbolicLink()) return true;
-    } catch { return true; }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") return true;
+    }
   }
   return false;
 }
