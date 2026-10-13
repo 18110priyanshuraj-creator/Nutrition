@@ -34,7 +34,7 @@ describe("autonomous upgrade runner guardrails", () => {
   });
 
   it("keeps key-slot credentials out of output and memory paths", () => {
-    expect(runner).toContain("function redact");
+    expect(runner).toContain('import {redactSecrets as redact} from "../src/lib/agent/secret-redaction"');
     expect(runner).toContain("redact(response.text.trim())");
     expect(runner).toContain('join(root, ".agent", "memory.json")');
     expect(runner).toContain('join(root, ".agent", "upgrade-report.json")');
