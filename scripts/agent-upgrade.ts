@@ -351,6 +351,18 @@ async function writeReport(root: string, report: Record<string, unknown>): Promi
 async function main(): Promise<void> {
   const root = rootDir();
   const requestedTask = process.argv.slice(2).join(" ").trim();
+  if (["--help", "-h", "help"].includes(requestedTask)) {
+    console.log([
+      "Autonomous Gemini coding-agent upgrade (bounded multi-round mode)",
+      "npm run agent:upgrade",
+      "npm run agent:upgrade -- \"task description\"",
+      "AGENT_UPGRADE_MAX_ROUNDS=4 (allowed range 1-8)",
+      "Runs fixed lint, typecheck, test and build checks after each accepted patch.",
+      "Can self-improve the main agent core; does not execute arbitrary model-provided shell commands.",
+      "Never commits, pushes or merges. Review git diff before accepting changes.",
+    ].join("\n"));
+    return;
+  }
   const task = redact(requestedTask ||
     "Upgrade this existing Gemini coding agent toward a reliable Copilot-style autonomous engineer: broader repository understanding, self-improvement of its own core, structured plans, safe multi-file changes, test-and-repair iterations, memory, progress reporting, robust Gemini failover, and meaningful tests. Fix evidenced high-priority bugs when appropriate.");
   const maxRounds = integer("AGENT_UPGRADE_MAX_ROUNDS", 4, 1, 8);
