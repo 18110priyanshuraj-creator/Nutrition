@@ -296,6 +296,27 @@ async function propose(
   }
   return proposal;
 }
+function executePlannedCommands(root: string, commands: PlannedTerminalCommand[]): string {
+  const results: string[] = [];
+  for (const item of commands.slice(0, 4)) {
+    const decision = validatePlannedTerminalCommand(item);
+    if (!decision.allowed) {
+      const message = "BLOCKED: " + decision.display + "\nReason: " + decision.reason;
+      results.push(message);
+      console.warn(message);
+      continue;
+    }
+    console.log("\n========== AGENT TERMINAL TOOL ==========");
+    console.log("$ " + decision.display + "\nReason: " + item.reason);
+    const result = run(decision.program, decision.args, root, decision.timeoutMs);
+    const output = (result.stdout + "\n" + result.stderr).trim().slice(-5500);
+    const entry = "$ " + decision.display + "\nExit status: " + String(result.status) + "\n" + (output || "(no output)");
+    results.push(entry);
+    console.log(entry);
+  }
+  return redact(results.join("\n\n")).slice(-18000);
+}
+
 async function applyProposal(
   root: string,
   proposal: Proposal,
