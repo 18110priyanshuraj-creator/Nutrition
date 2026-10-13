@@ -13,7 +13,7 @@ export async function GET(request:Request){
     keyConfigured:hasGeminiKey(),
     message:status.configured&&status.modelConfigured
       ?"Gemini is configured. Run a test request to verify provider access."
-      :"Configure GEMINI_MODEL and GEMINI_API_KEY_1 through GEMINI_API_KEY_4 on the server. The legacy GEMINI_API_KEY is also supported.",
+      :"Configure GEMINI_MODEL and GEMINI_API_KEY_1 through GEMINI_API_KEY_7 on the server. The legacy GEMINI_API_KEY is also supported.",
   },{headers:{"Cache-Control":"no-store"}});
 }
 export async function POST(request:Request){
