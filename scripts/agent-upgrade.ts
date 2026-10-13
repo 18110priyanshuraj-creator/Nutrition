@@ -420,18 +420,18 @@ async function main(): Promise<void> {
   }
   // Keep only the best-scoring state. Restore only paths still matching the exact contents written by this run.
   if (health(latestChecks) < bestHealth && bestSnapshot.size > 0) {
-    const completeBest = new Map([...changed].map((path) => [
+    const completeBest: FileSnapshot = new Map([...changed].map((path) => [
       path,
       bestSnapshot.has(path) ? bestSnapshot.get(path) as string | null
         : initialContents.has(path) ? initialContents.get(path) as string : null,
-    ]));
+    ] as const));
     const warnings = await restoreSnapshot(root, completeBest, lastOwned);
     warnings.forEach((warning) => console.warn(warning));
     latestChecks = checkSet(root);
     console.log("Restored the last best-scoring agent-owned snapshot.");
   } else if (health(latestChecks) < bestHealth && changed.size > 0) {
     console.warn("No better checkpoint exists; preserving the initial repository state where safely recoverable.");
-    const initialSnapshot: FileSnapshot = new Map([...changed].map((path) => [path, initialContents.has(path) ? initialContents.get(path) as string : null]));
+    const initialSnapshot: FileSnapshot = new Map([...changed].map((path) => [path, initialContents.has(path) ? initialContents.get(path) as string : null] as const));
     const warnings = await restoreSnapshot(root, initialSnapshot, lastOwned);
     warnings.forEach((warning) => console.warn(warning));
     latestChecks = checkSet(root);
