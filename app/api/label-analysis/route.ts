@@ -1,4 +1,5 @@
 import {GoogleGenAI} from "@google/genai";
+import {classifyGeminiError, hasGeminiKey, withGeminiKeyFailover} from "@/lib/agent/gemini-provider";
 import {NextRequest,NextResponse} from "next/server";
 import {z} from "zod";
 import {requireOwner} from "@/lib/server-auth";
@@ -28,7 +29,6 @@ const jsonSchema={
   overallConfidence:{type:"string",enum:["low","medium","high"]},issues:{type:"array",items:{type:"string"}}
  },required:["productName","servingSizeText","servingGrams","basis","nutrients","overallConfidence","issues"],propertyOrdering:["productName","servingSizeText","servingGrams","basis","nutrients","overallConfidence","issues"]
 };
-const attempts=()=>{const n=Number(process.env.GEMINI_MAX_RETRIES??1);return 1+(Number.isFinite(n)?Math.max(0,Math.min(2,Math.floor(n))):1);};
 const counts=new Map<string,{count:number;start:number}>();
 function tooMany(request:NextRequest):boolean{const ip=request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()||"unknown",now=Date.now(),old=counts.get(ip);if(old&&now-old.start<60000&&old.count>=5)return true;counts.set(ip,old&&now-old.start<60000?{count:old.count+1,start:old.start}:{count:1,start:now});return false;}
 function imageMime(b:Uint8Array):string|null{
@@ -48,13 +48,15 @@ export async function POST(request:NextRequest){
  if(file.size>maxMb*1024*1024)return NextResponse.json({error:"Image exceeds the configured "+maxMb+" MB limit."},{status:413});
  const bytes=new Uint8Array(await file.arrayBuffer());const mimeType=imageMime(bytes);
  if(!mimeType)return NextResponse.json({error:"Image contents were invalid. Use a real JPEG, PNG, or WebP file."},{status:415});
- const key=process.env.GEMINI_API_KEY,model=process.env.GEMINI_MODEL;
- if(!key||!model)return NextResponse.json({error:"Package-label extraction requires server-side GEMINI_API_KEY and GEMINI_MODEL. Nothing was saved."},{status:503});
+ const model=process.env.GEMINI_MODEL?.trim();
+ if(!hasGeminiKey()||!model)return NextResponse.json({error:"Package-label extraction requires GEMINI_MODEL and at least one server-side Gemini key slot (GEMINI_API_KEY_1 through GEMINI_API_KEY_7). Nothing was saved."},{status:503});
  const prompt="Read the visible nutrition facts label in the provided image. Do not guess unreadable values. Return product name if visible, serving-size text, servingGrams only when the label states or clearly establishes a weight in grams (do not equate millilitres to grams without evidence), basis per_100g or per_serving, and only nutrient values visibly present. Map labels to one of these canonical keys only when the identity and reporting convention are clear: "+keyList.join(", ")+". Otherwise use key other or null. Source units must match the label. For vitamin A, state uncertainty about retinol/RAE form if not specified; for folate and niacin mention convention uncertainty. Never calculate nutrition for foods based on the photograph. Provide short issues for unreadable/cropped/ambiguous parts. Confidence is about reading clarity, not scientific verification.";
- const timeoutRaw=Number(process.env.GEMINI_REQUEST_TIMEOUT_MS??20000),timeout=Number.isFinite(timeoutRaw)?Math.max(3000,Math.min(60000,timeoutRaw)):20000;
+ const timeoutRaw=Number(process.env.GEMINI_REQUEST_TIMEOUT_MS??60000),timeout=Number.isFinite(timeoutRaw)?Math.max(3000,Math.min(120000,timeoutRaw)):60000;
  try{
-  const ai=new GoogleGenAI({apiKey:key,httpOptions:{timeout,retryOptions:{attempts:attempts()}}});
-  const response=await ai.models.generateContent({model,contents:[{text:prompt},{inlineData:{mimeType,data:Buffer.from(bytes).toString("base64")}}],config:{temperature:0,maxOutputTokens:2400,responseMimeType:"application/json",responseJsonSchema:jsonSchema as never}});
+  const response=await withGeminiKeyFailover(async(apiKey)=>{
+   const ai=new GoogleGenAI({apiKey,httpOptions:{timeout,retryOptions:{attempts:1}}});
+   return ai.models.generateContent({model,contents:[{text:prompt},{inlineData:{mimeType,data:Buffer.from(bytes).toString("base64")}}],config:{temperature:0,maxOutputTokens:2400,responseMimeType:"application/json",responseJsonSchema:jsonSchema as never}});
+  });
   if(!response.text)return NextResponse.json({error:"Gemini returned no label text. Nothing was saved."},{status:502});
   let raw:unknown;try{raw=JSON.parse(response.text);}catch{return NextResponse.json({error:"Gemini returned malformed label data. Nothing was saved."},{status:502});}
   const parsed=schema.safeParse(raw);if(!parsed.success)return NextResponse.json({error:"The label proposal did not pass validation. Nothing was saved."},{status:502});
@@ -66,8 +68,9 @@ export async function POST(request:NextRequest){
   });
   return NextResponse.json({mode:"gemini",productName:label.productName,servingSizeText:label.servingSizeText,servingGrams:label.servingGrams,basis,overallConfidence:label.overallConfidence,nutrients,issues:label.issues,warning:"AI label transcription must be compared with the physical label. Values are not independently verified and no food is saved automatically."},{headers:{"Cache-Control":"no-store"}});
  }catch(error){
-  const message=String(error instanceof Error?error.message:error).toLowerCase();
-  const status=message.includes("429")||message.includes("quota")?503:message.includes("timeout")||message.includes("abort")?504:502;
-  return NextResponse.json({error:status===503?"Gemini quota/rate limit reached.":status===504?"Label analysis timed out.":"Gemini label analysis failed. Check model access and try again later.",manualReviewAvailable:true},{status});
+  const category=classifyGeminiError(error);
+  const status=category==="rate_limit"||category==="project_quota"||category==="model_not_found"?503:category==="timeout"?504:category==="invalid_request"?400:502;
+  const message=category==="project_quota"?"Gemini project-wide quota/billing limit reached.":category==="rate_limit"?"All available Gemini key slots are rate-limited or cooling down.":category==="invalid_key"||category==="permission"?"Gemini credentials or project permissions failed for the available key slots.":category==="model_not_found"?"The configured Gemini model is unavailable.":category==="timeout"?"Label analysis timed out after key failover.":category==="network"?"Gemini network request failed across key slots.":category==="invalid_request"?"Gemini rejected the label-analysis request.":"Gemini label analysis failed. Check model access and try again later.";
+  return NextResponse.json({error:message,category,manualReviewAvailable:true},{status,headers:{"Cache-Control":"no-store"}});
  }
 }
