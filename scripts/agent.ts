@@ -122,7 +122,7 @@ function sourceContext(root:string,diag:string,memory:Memory):string{
 async function propose(task:string,root:string,diag:string,memory:Memory):Promise<z.infer<typeof schema>>{
   const model=process.env.GEMINI_MODEL?.trim();
   if(!model)throw new Error("Set GEMINI_MODEL in the private Codespace environment.");
-  if(!configuredGeminiKeys().length)throw new Error("Set GEMINI_API_KEY_1 through GEMINI_API_KEY_4 in the private Codespace environment.");
+  if(!configuredGeminiKeys().length)throw new Error("Set GEMINI_API_KEY_1 through GEMINI_API_KEY_7 in the private Codespace environment.");
   const prompt=[
     "Propose the smallest safe code fix for this existing personal nutrition tracker.",
     "Owner task: "+(task||"Repair failures from the check suite."),
