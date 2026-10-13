@@ -23,6 +23,7 @@ jobs:
         run: |
           npm run agent -- --help
           npm run agent -- status
+          npm run agent:upgrade -- --help
       - name: Database migration smoke test
         run: npm run db:migrate
       - name: Run unit tests
