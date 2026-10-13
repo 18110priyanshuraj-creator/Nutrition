@@ -1,4 +1,4 @@
-# Self-healing repository agent
+# Self-healing and autonomous repository agent
 
 This is a guarded maintenance CLI added to the existing MyNutri app. It uses the project's existing Node/TypeScript setup, Vitest and Google Gemini SDK. It does not replace the nutrition calculation engine.
 
@@ -16,7 +16,7 @@ This is a guarded maintenance CLI added to the existing MyNutri app. It uses the
 
 The background watcher runs only while its process/Codespace remains alive. It skips expensive checks/audits when the repository fingerprint has not changed. On each source change, it runs checks and, when Gemini is configured, a cautious AI bug audit. A scheduled GitHub Actions workflow is separate from this local monitor.
 
-## Four-key Gemini failover
+## Seven-slot Gemini failover
 
 Configure private server-side environment variables:
 
@@ -32,12 +32,14 @@ Timeouts, network errors and key-specific credential errors rotate to another av
 
 ## Safety model
 
+The original `agent` command remains a deliberately narrow repair mode. `agent:upgrade` is a separate, broader self-improvement mode with a default maximum of four rounds (`AGENT_UPGRADE_MAX_ROUNDS`, bounded to 1–8). It may edit its own main agent and `src/lib/agent/` implementation, and can create source/test files. It still does not execute model-provided shell commands, change authentication/session or database/schema/migration code, edit secrets/lockfiles/workflows/agent-upgrade runner, deploy, commit, push, or merge. It runs only the repository's fixed `lint`, `typecheck`, `test`, and `build` scripts, and preserves a best-scoring checkpoint.
+
 - The agent operates on the current checked-out branch only. It never creates branches, commits, pushes, or merges.
 - Existing uncommitted and untracked work is preserved. A tracked file already modified by a person is ineligible for an automatic patch.
-- Automatic edits are restricted to clean, existing TypeScript/TSX app and test files. Auth/session, database/schema/migrations, restore endpoints, environment files, dependency configuration/lockfiles, workflows and agent core are protected.
+- The original repair mode edits only clean existing TypeScript/TSX app/test files and protects agent core. The upgrade mode can edit eligible clean source files including `scripts/agent.ts` and `src/lib/agent/`, plus create new source/test files. Auth/session, database/schema/migrations, restore endpoints, environment files, package/lock configuration, workflows and the upgrade runner itself remain protected.
 - Each candidate patch must pass \`git diff --check\`, lint, typecheck, tests and production build. When verification fails, only that patch is reverted, and only if the file still exactly matches the agent's proposal.
-- The agent makes at most three repair attempts by default. A passing repair remains uncommitted on the current branch so the diff can be reviewed first.
-- The local \`.agent/memory.json\` stores bounded run summaries and lessons from verified, passing repairs. It does not store API keys, meal records, photos, database contents or full diagnostic output. The model cannot edit the agent core.
+- The original repair mode makes at most three repair attempts by default. The upgrade mode runs up to four plan/edit/verify rounds by default and may be configured between one and eight rounds. A passing repair remains uncommitted on the current branch so the diff can be reviewed first.
+- The local \`.agent/memory.json\` stores bounded run summaries and lessons from verified, passing repairs. It does not store API keys, meal records, photos, database contents or full diagnostic output. The original maintenance mode cannot edit the agent core; the separate upgrade mode can improve the main agent core but cannot edit its own upgrade runner.
 - This is guarded automation, not a promise that every issue can be repaired automatically. Review generated diffs before committing.
 
 ## Environment controls
@@ -55,3 +57,11 @@ Timeouts, network errors and key-specific credential errors rotate to another av
 - \`AGENT_CHECK_TIMEOUT_MS=900000\`: per-check timeout, bounded by the program.
 
 Only the fixed project check scripts are executed. Gemini cannot ask the host to execute arbitrary shell commands.
+
+### Upgrade-runner controls
+
+- `AGENT_UPGRADE_MAX_ROUNDS=4`: plan/edit/verify rounds, bounded to 1–8.
+- `AGENT_UPGRADE_CHECK_TIMEOUT_MS=900000`: per-check timeout, bounded by the runner.
+- `AGENT_UPGRADE_MAX_OUTPUT_TOKENS=24576`: maximum Gemini response budget, bounded by the runner.
+
+The upgrade runner writes a redacted progress report to the ignored local `.agent/upgrade-report.json`. Inspect `git diff` before accepting changes; the runner does not commit or push.
