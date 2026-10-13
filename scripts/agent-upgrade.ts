@@ -178,9 +178,6 @@ function checkSummary(items: Check[]): string {
 function diagnostics(items: Check[]): string {
   return redact(items.map((item) => "## " + item.name + " " + (item.ok ? "PASS" : "FAIL") + "\n" + item.output.slice(-5000)).join("\n\n")).slice(-24000);
 }
-function health(items: Check[]): number {
-  return items.filter((item) => item.ok).length;
-}
 function isAtLeastAsGood(candidate: Check[], best: Check[]): boolean {
   const currentByName = new Map(candidate.map((item) => [item.name, item.ok]));
   return best.every((item) => !item.ok || currentByName.get(item.name) === true);
@@ -572,7 +569,7 @@ async function main(): Promise<void> {
         checks: latestChecks.map(({name, ok, durationMs}) => ({name, ok, durationMs})),
         changedFiles: [...changed], rounds: history, stopReason: proposal.continue ? "Continuing" : "Model indicated completion",
       });
-      if (score === CHECK_NAMES.length) console.log("All checks passed for round " + round + ".");
+      if (latestChecks.every((item) => item.ok)) console.log("All checks passed for round " + round + ".");
       else console.log("Checks are not all passing. Feeding diagnostics into the next repair round.");
       if (!proposal.continue) {
         stopReason = "Gemini indicated that no additional round is needed.";
