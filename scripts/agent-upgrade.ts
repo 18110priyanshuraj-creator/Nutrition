@@ -291,7 +291,9 @@ async function propose(
   if (!response.text?.trim()) throw new Error("Gemini returned an empty upgrade proposal.");
   const raw = response.text.trim().replace(/^[\x60]{3}(?:json)?\s*/i, "").replace(/\s*[\x60]{3}$/, "");
   const proposal = proposalSchema.parse(JSON.parse(raw));
-  if (isSecretLike(proposal.summary) || proposal.files.some((file) => isSecretLike(file.content))) {
+  if (isSecretLike(proposal.summary) ||
+      proposal.files.some((file) => isSecretLike(file.content)) ||
+      proposal.commands.some((command) => isSecretLike(command.reason) || isSecretLike(command.args.join(" ")))) {
     throw new Error("Rejected the generated proposal because it resembled a secret.");
   }
   return proposal;
@@ -301,16 +303,17 @@ function executePlannedCommands(root: string, commands: PlannedTerminalCommand[]
   for (const item of commands.slice(0, 4)) {
     const decision = validatePlannedTerminalCommand(item);
     if (!decision.allowed) {
-      const message = "BLOCKED: " + decision.display + "\nReason: " + decision.reason;
+      const message = redact("BLOCKED: " + decision.display + "\nReason: " + decision.reason);
       results.push(message);
       console.warn(message);
       continue;
     }
+    const safeDisplay = redact(decision.display);
     console.log("\n========== AGENT TERMINAL TOOL ==========");
-    console.log("$ " + decision.display + "\nReason: " + item.reason);
+    console.log("$ " + safeDisplay + "\nReason: " + redact(item.reason));
     const result = run(decision.program, decision.args, root, decision.timeoutMs);
-    const output = (result.stdout + "\n" + result.stderr).trim().slice(-5500);
-    const entry = "$ " + decision.display + "\nExit status: " + String(result.status) + "\n" + (output || "(no output)");
+    const output = redact((result.stdout + "\n" + result.stderr).trim()).slice(-5500);
+    const entry = "$ " + safeDisplay + "\nExit status: " + String(result.status) + "\n" + (output || "(no output)");
     results.push(entry);
     console.log(entry);
   }
