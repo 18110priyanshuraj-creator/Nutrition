@@ -7,6 +7,7 @@ import {readFileSync} from "node:fs";
 import {mkdir, readFile, rm, writeFile} from "node:fs/promises";
 import {dirname, isAbsolute, join} from "node:path";
 import {configuredGeminiKeys, getGeminiProviderStatus, GeminiFailoverError, withGeminiKeyFailover} from "../src/lib/agent/gemini-provider";
+import {redactSecrets as redact} from "../src/lib/agent/secret-redaction";
 
 type Check = {name: string; ok: boolean; output: string; durationMs: number};
 type Memory = {
@@ -28,11 +29,6 @@ function bool(name: string, fallback: boolean): boolean {
 function integer(name: string, fallback: number, min: number, max: number): number {
   const value = Number(process.env[name]);
   return Number.isInteger(value) ? Math.max(min, Math.min(max,value)) : fallback;
-}
-function redact(value: string): string {
-  return value.replace(/(?:AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,})/g,"[REDACTED_KEY]")
-    .replace(/(GEMINI_API_KEY(?:_[1-7])?|SESSION_SECRET|APP_PASSWORD)\s*[:=]\s*[^\s"' \x60,]+/gi,"$1=[REDACTED]")
-    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,"[REDACTED_PRIVATE_KEY]");
 }
 function capture(command: string, args: string[], cwd: string): {status:number|null; stdout:string; stderr:string} {
   const result = spawnSync(command,args,{cwd,encoding:"utf8",timeout:20000,maxBuffer:6*1024*1024,windowsHide:true,env:process.env});
