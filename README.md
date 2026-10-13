@@ -34,10 +34,10 @@ A guarded local maintenance CLI can run the project's lint, typecheck, test and 
 - Run `npm run agent -- scan` to check, repair failures, and audit changed code for concrete bugs when Gemini is configured.
 - Run `npm run agent -- "describe a focused task"` to request a code change.
 - Run `npm run agent:watch` to monitor changes while the Codespace process remains alive.
-- Run `npm run agent:upgrade` for a bounded multi-round Gemini coding-agent upgrade that can improve the agent core, edit multiple eligible files, run checks after each round, and retain the best-scoring patch, improve its own runner under verification, and reuse verified local project memory (up to eight rounds by default).
+- Run `npm run agent:upgrade` for a multi-round Gemini coding-agent upgrade. It can use validated Git/search/test terminal tools, edit multiple eligible files including its own agent core, run checks after each patch, repair failures, retain the best-scoring checkpoint, and reuse verified project memory (up to eight rounds by default).
 - Run `npm run agent -- status` to inspect redacted seven-slot Gemini failover status.
 
-Set `GEMINI_MODEL` and `GEMINI_API_KEY_1` through `GEMINI_API_KEY_7` in the private server environment. The legacy `GEMINI_API_KEY` remains supported when numbered slots are absent. The maintenance command does not create branches, commit, push or merge. The upgrade command can modify its main agent core through a bounded test-and-repair loop, but still preserves pre-existing dirty files, protects auth/database/secrets, and never runs arbitrary model-provided shell commands or pushes/merges. See [the agent guide](docs/SELF_HEALING_AGENT.md) for limits and safety details.
+Set `GEMINI_MODEL` and `GEMINI_API_KEY_1` through `GEMINI_API_KEY_7` in the private server environment. The legacy `GEMINI_API_KEY` remains supported when numbered slots are absent. The maintenance command does not create branches, commit, push or merge. The upgrade command can use allowlisted terminal tools and modify its main agent core plus the upgrade runner through a bounded test-and-repair loop, but still preserves pre-existing dirty files, protects auth/database/secrets, and never runs arbitrary model-provided shell commands or pushes/merges. See [the agent guide](docs/SELF_HEALING_AGENT.md) for limits and safety details.
 
 ## Checks
 
