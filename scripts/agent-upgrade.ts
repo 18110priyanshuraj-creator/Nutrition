@@ -7,10 +7,11 @@ import {existsSync, lstatSync, readFileSync} from "node:fs";
 import {mkdir, readFile, rm, writeFile} from "node:fs/promises";
 import {dirname, isAbsolute, join, relative, resolve, sep} from "node:path";
 import {configuredGeminiKeys, withGeminiKeyFailover} from "../src/lib/agent/gemini-provider";
+import {validatePlannedTerminalCommand, type PlannedTerminalCommand} from "../src/lib/agent/command-policy";
 
 type Check = {name: string; ok: boolean; output: string; durationMs: number};
 type ProposedFile = {path: string; content: string; reason: string};
-type Proposal = {summary: string; continue: boolean; nextFocus: string; files: ProposedFile[]};
+type Proposal = {summary: string; continue: boolean; nextFocus: string; commands: PlannedTerminalCommand[]; files: ProposedFile[]};
 type FileSnapshot = Map<string, string | null>;
 type ProjectMemory = {
   version: 1;
@@ -23,6 +24,11 @@ const proposalSchema = z.object({
   summary: z.string().min(1).max(1200),
   continue: z.boolean(),
   nextFocus: z.string().max(600),
+  commands: z.array(z.object({
+    program: z.enum(["git", "npm", "rg"]),
+    args: z.array(z.string().max(240)).max(4),
+    reason: z.string().min(3).max(500),
+  }).strict()).max(4),
   files: z.array(z.object({
     path: z.string().min(1).max(240),
     content: z.string().max(140000),
@@ -36,6 +42,19 @@ const responseJsonSchema = {
     summary: {type: "string"},
     continue: {type: "boolean"},
     nextFocus: {type: "string"},
+    commands: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          program: {type: "string", enum: ["git", "npm", "rg"]},
+          args: {type: "array", items: {type: "string"}},
+          reason: {type: "string"},
+        },
+        required: ["program", "args", "reason"],
+        propertyOrdering: ["program", "args", "reason"],
+      },
+    },
     files: {
       type: "array",
       items: {
@@ -46,8 +65,8 @@ const responseJsonSchema = {
       },
     },
   },
-  required: ["summary", "continue", "nextFocus", "files"],
-  propertyOrdering: ["summary", "continue", "nextFocus", "files"],
+  required: ["summary", "continue", "nextFocus", "commands", "files"],
+  propertyOrdering: ["summary", "continue", "nextFocus", "commands", "files"],
 };
 
 const CHECK_NAMES = ["lint", "typecheck", "test", "build"] as const;
