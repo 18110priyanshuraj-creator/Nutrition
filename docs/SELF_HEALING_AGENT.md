@@ -10,13 +10,13 @@ This is a guarded maintenance CLI added to the existing MyNutri app. It uses the
 - `npm run agent -- fix` — same as scan, but intended to focus on current check failures.
 - `npm run agent -- "task description"` — ask Gemini to make a scoped change, then verify it.
 - `npm run agent:watch` — keep the background monitor running in this Codespace terminal.
+- Run `npm run agent:upgrade` — start the bounded multi-round self-upgrade runner. An optional task can follow `--`, for example `npm run agent:upgrade -- "Improve memory and repair recovery"`.
 - `npm run agent -- status` — view sanitized Gemini provider/key-slot status.
 - `npm run agent -- memory` — view local run summaries and verified lessons.
 - `npm run agent -- memory clear` — clear only the local agent memory.
 
 The background watcher runs only while its process/Codespace remains alive. It skips expensive checks/audits when the repository fingerprint has not changed. On each source change, it runs checks and, when Gemini is configured, a cautious AI bug audit. A scheduled GitHub Actions workflow is separate from this local monitor.
 
-- Run `npm run agent:upgrade` — start the bounded multi-round self-upgrade runner. An optional task can follow `--`, for example `npm run agent:upgrade -- "Improve memory and repair recovery"`.
 
 ## Seven-slot Gemini failover
 
