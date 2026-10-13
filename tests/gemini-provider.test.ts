@@ -19,6 +19,23 @@ describe("Gemini key configuration", () => {
     expect(JSON.stringify(status)).not.toContain("secret-one");
     expect(JSON.stringify(status)).not.toContain("legacy-secret");
   });
+  it("supports slots five through seven without exposing key material", () => {
+    const env = {
+      GEMINI_API_KEY_5: "secret-five",
+      GEMINI_API_KEY_6: "secret-six",
+      GEMINI_API_KEY_7: "secret-seven",
+      GEMINI_API_KEY: "legacy-secret",
+      GEMINI_MODEL: "test-model",
+    };
+    const processEnv = env as unknown as NodeJS.ProcessEnv;
+    expect(configuredGeminiKeys(processEnv).map((slot) => slot.label)).toEqual(["Slot 5", "Slot 6", "Slot 7"]);
+    const status = getGeminiProviderStatus(processEnv);
+    expect(status.slots.filter((slot) => slot.configured).map((slot) => slot.label)).toEqual(["Slot 5", "Slot 6", "Slot 7"]);
+    const serialized = JSON.stringify(status);
+    expect(serialized).not.toContain("secret-five");
+    expect(serialized).not.toContain("secret-six");
+    expect(serialized).not.toContain("secret-seven");
+  });
   it("keeps legacy key configuration working when numbered slots are absent", () => {
     expect(configuredGeminiKeys({GEMINI_API_KEY: "legacy-secret"} as unknown as NodeJS.ProcessEnv)).toEqual([{label: "Legacy fallback", apiKey: "legacy-secret"}]);
   });
