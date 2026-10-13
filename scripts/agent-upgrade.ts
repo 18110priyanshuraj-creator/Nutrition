@@ -7,6 +7,7 @@ import {existsSync, lstatSync, readFileSync} from "node:fs";
 import {mkdir, readFile, rm, writeFile} from "node:fs/promises";
 import {dirname, isAbsolute, join, relative, resolve, sep} from "node:path";
 import {configuredGeminiKeys, withGeminiKeyFailover} from "../src/lib/agent/gemini-provider";
+import {redactSecrets as redact} from "../src/lib/agent/secret-redaction";
 import {validatePlannedTerminalCommand, type PlannedTerminalCommand} from "../src/lib/agent/command-policy";
 
 type Check = {name: string; ok: boolean; output: string; durationMs: number};
@@ -77,13 +78,6 @@ const SECRET_PATTERN = /(?:AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,}|GOCSPX-
 function integer(name: string, fallback: number, min: number, max: number): number {
   const value = Number(process.env[name]);
   return Number.isInteger(value) ? Math.max(min, Math.min(max, value)) : fallback;
-}
-function redact(value: string): string {
-  return value
-    .replace(/(?:AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,}|GOCSPX-[0-9A-Za-z_-]{18,}|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{25,}|sk-[A-Za-z0-9_-]{20,})/g, "[REDACTED_KEY]")
-    .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]{16,}={0,2}/gi, "Bearer [REDACTED]")
-    .replace(/(\b[A-Z0-9_]*(?:API[_-]?KEY|APIKEY|ACCESS[_-]?TOKEN|AUTH[_-]?TOKEN|TOKEN|SECRET|PASSWORD|CREDENTIALS?|PRIVATE[_-]?KEY)[A-Z0-9_]*\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s"'\x60,;]+)/gi, "$1[REDACTED]")
-    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, "[REDACTED_PRIVATE_KEY]");
 }
 function run(command: string, args: string[], cwd: string, timeoutMs = 30000): {status: number | null; stdout: string; stderr: string} {
   const npmCli = command === "npm" ? process.env.npm_execpath : undefined;
