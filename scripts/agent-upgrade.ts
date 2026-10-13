@@ -84,9 +84,13 @@ function redact(value: string): string {
     .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, "[REDACTED_PRIVATE_KEY]");
 }
 function run(command: string, args: string[], cwd: string, timeoutMs = 30000): {status: number | null; stdout: string; stderr: string} {
-  const result = spawnSync(command, args, {
+  const npmCli = command === "npm" ? process.env.npm_execpath : undefined;
+  const runThroughNode = Boolean(npmCli && existsSync(npmCli));
+  const executable = runThroughNode ? process.execPath : command;
+  const executableArgs = runThroughNode ? [npmCli as string, ...args] : args;
+  const result = spawnSync(executable, executableArgs, {
     cwd, encoding: "utf8", timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024,
-    windowsHide: true, shell: process.platform === "win32", env: process.env,
+    windowsHide: true, shell: false, env: process.env,
   });
   return {status: result.status, stdout: redact(String(result.stdout || "")), stderr: redact(String(result.stderr || result.error?.message || ""))};
 }
