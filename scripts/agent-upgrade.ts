@@ -181,6 +181,10 @@ function diagnostics(items: Check[]): string {
 function health(items: Check[]): number {
   return items.filter((item) => item.ok).length;
 }
+function isAtLeastAsGood(candidate: Check[], best: Check[]): boolean {
+  const currentByName = new Map(candidate.map((item) => [item.name, item.ok]));
+  return best.every((item) => !item.ok || currentByName.get(item.name) === true);
+}
 function snapshot(root: string, changed: Set<string>): Promise<FileSnapshot> {
   return Promise.all([...changed].map(async (path) => {
     try { return [path, await readFile(join(root, path), "utf8")] as const; }
@@ -507,6 +511,7 @@ async function main(): Promise<void> {
   const baseline = checkSet(root);
   console.log("\nBaseline: " + checkSummary(baseline));
   let bestHealth = health(baseline);
+  let bestChecks = baseline;
   let bestSnapshot: FileSnapshot = new Map();
   const changed = new Set<string>();
   const lastOwned = new Map<string, string | null>();
@@ -557,9 +562,12 @@ async function main(): Promise<void> {
       latestChecks = checkSet(root);
       const score = health(latestChecks);
       history.push("Round " + round + ": " + proposal.summary + "; changed=" + written.join(", ") + "; checks=" + checkSummary(latestChecks));
-      if (score >= bestHealth) {
+      if (isAtLeastAsGood(latestChecks, bestChecks)) {
         bestHealth = score;
+        bestChecks = latestChecks;
         bestSnapshot = await snapshot(root, changed);
+      } else {
+        console.warn("This patch regressed a previously passing check; keeping the previous best checkpoint for recovery.");
       }
       await writeReport(root, {
         updatedAt: new Date().toISOString(), task, round, maxRounds,
@@ -583,7 +591,7 @@ async function main(): Promise<void> {
     }
   }
   // Keep only the best-scoring state. Restore only paths still matching the exact contents written by this run.
-  if (health(latestChecks) < bestHealth && bestSnapshot.size > 0) {
+  if (!isAtLeastAsGood(latestChecks, bestChecks) && bestSnapshot.size > 0) {
     const completeBest: FileSnapshot = new Map([...changed].map((path) => [
       path,
       bestSnapshot.has(path) ? bestSnapshot.get(path) as string | null
@@ -593,7 +601,7 @@ async function main(): Promise<void> {
     warnings.forEach((warning) => console.warn(warning));
     latestChecks = checkSet(root);
     console.log("Restored the last best-scoring agent-owned snapshot.");
-  } else if (health(latestChecks) < bestHealth && changed.size > 0) {
+  } else if (!isAtLeastAsGood(latestChecks, bestChecks) && changed.size > 0) {
     console.warn("No better checkpoint exists; preserving the initial repository state where safely recoverable.");
     const initialSnapshot: FileSnapshot = new Map([...changed].map((path) => [path, initialContents.has(path) ? initialContents.get(path) as string : null] as const));
     const warnings = await restoreSnapshot(root, initialSnapshot, lastOwned);
