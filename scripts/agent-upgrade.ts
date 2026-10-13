@@ -51,10 +51,6 @@ function integer(name: string, fallback: number, min: number, max: number): numb
   const value = Number(process.env[name]);
   return Number.isInteger(value) ? Math.max(min, Math.min(max, value)) : fallback;
 }
-function enabled(name: string, fallback: boolean): boolean {
-  const value = process.env[name]?.trim().toLowerCase();
-  return value ? ["1", "true", "yes", "on"].includes(value) : fallback;
-}
 function redact(value: string): string {
   return value
     .replace(/(?:AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,}|GOCSPX-[0-9A-Za-z_-]{18,})/g, "[REDACTED_KEY]")
@@ -396,7 +392,12 @@ async function main(): Promise<void> {
   }
   // Keep only the best-scoring state. Restore only paths still matching the exact contents written by this run.
   if (health(latestChecks) < bestHealth && bestSnapshot.size > 0) {
-    const warnings = await restoreSnapshot(root, bestSnapshot, lastOwned);
+    const completeBest = new Map([...changed].map((path) => [
+      path,
+      bestSnapshot.has(path) ? bestSnapshot.get(path) as string | null
+        : initialContents.has(path) ? initialContents.get(path) as string : null,
+    ]));
+    const warnings = await restoreSnapshot(root, completeBest, lastOwned);
     warnings.forEach((warning) => console.warn(warning));
     latestChecks = checkSet(root);
     console.log("Restored the last best-scoring agent-owned snapshot.");
