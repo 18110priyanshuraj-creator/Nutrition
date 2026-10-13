@@ -16,6 +16,13 @@ describe("agent terminal command policy", () => {
     expect(validatePlannedTerminalCommand({program: "npm", args: ["run", "agent:upgrade", "--", "--help"], reason: "Check CLI help"}).allowed).toBe(true);
   });
 
+  it("allows read-only diagnostics and memory, but not recursive repair or watch mode", () => {
+    expect(validatePlannedTerminalCommand({program: "npm", args: ["run", "agent:doctor"], reason: "Check all project health"}).allowed).toBe(true);
+    expect(validatePlannedTerminalCommand({program: "npm", args: ["run", "agent:memory"], reason: "Read saved agent lessons"}).allowed).toBe(true);
+    expect(validatePlannedTerminalCommand({program: "npm", args: ["run", "agent:scan"], reason: "Run autonomous repair"}).allowed).toBe(false);
+    expect(validatePlannedTerminalCommand({program: "npm", args: ["run", "agent:watch"], reason: "Start long-lived watcher"}).allowed).toBe(false);
+  });
+
   it("blocks installs, database migrations, arbitrary scripts and shell injection", () => {
     expect(validatePlannedTerminalCommand({program: "npm", args: ["install"], reason: "Need dependency"}).allowed).toBe(false);
     expect(validatePlannedTerminalCommand({program: "npm", args: ["run", "db:migrate"], reason: "Change database"}).allowed).toBe(false);
