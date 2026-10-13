@@ -52,7 +52,7 @@ export async function POST(request:NextRequest){
    const v=totals.calcium_mg,t=targets.calcium_mg;
    return NextResponse.json({mode:"local",answer:v?.complete&&meals.length&&typeof t?.target==="number"?"Saved calcium estimate for "+date+": "+v.amount.toFixed(1)+" mg against your selected "+t.target+" mg target. Remaining: "+Math.max(0,t.target-v.amount).toFixed(1)+" mg.": "Calcium data for "+date+" is partial or unavailable. Missing food values are not treated as zero.",notice:"Gemini is not configured. This is a database summary, not a diagnosis."});
   }
-  return NextResponse.json({mode:"local",answer:"I can answer saved-meal questions about protein, calcium, and what is logged for the selected date without Gemini. For more complex questions, configure GEMINI_API_KEY and GEMINI_MODEL in the server environment. I do not invent historical meals or make diagnostic claims."});
+  return NextResponse.json({mode:"local",answer:"I can answer saved-meal questions about protein, calcium, and what is logged for the selected date without Gemini. For more complex questions, configure GEMINI_MODEL and one or more key slots (GEMINI_API_KEY_1 through GEMINI_API_KEY_7); legacy GEMINI_API_KEY is also supported. I do not invent historical meals or make diagnostic claims."});
  }
  try{
   const response=await withGeminiKeyFailover(async(apiKey)=>{
