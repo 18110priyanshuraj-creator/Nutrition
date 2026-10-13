@@ -373,22 +373,22 @@ async function main(): Promise<void> {
   for (let round = 1; round <= maxRounds; round++) {
     completedRounds = round;
     console.log("\n========== AUTONOMOUS ROUND " + round + "/" + maxRounds + " ==========");
-    const visibleFiles = new Map(initialContents);
-    for (const path of changed) {
-      try { visibleFiles.set(path, await readFile(join(root, path), "utf8")); }
-      catch { visibleFiles.delete(path); }
-    }
-    const promptInventory = inventory([...new Set([...visibleFiles.keys(), ...changed])]);
-    const context = sourceContext(root, visibleFiles, changed);
-    const checkInfo = checkSummary(latestChecks) + "\n\n" + diagnostics(latestChecks);
-    const proposal = await propose(root, task, round, maxRounds, promptInventory, context, checkInfo, history);
-    latestSummary = proposal.summary;
-    console.log("Gemini plan: " + proposal.summary);
-    if (!proposal.files.length) {
-      stopReason = proposal.continue ? "Gemini requested another round but proposed no changes." : "No further concrete change proposed.";
-      break;
-    }
     try {
+      const visibleFiles = new Map(initialContents);
+      for (const path of changed) {
+        try { visibleFiles.set(path, await readFile(join(root, path), "utf8")); }
+        catch { visibleFiles.delete(path); }
+      }
+      const promptInventory = inventory([...new Set([...visibleFiles.keys(), ...changed])]);
+      const context = sourceContext(root, visibleFiles, changed);
+      const checkInfo = checkSummary(latestChecks) + "\n\n" + diagnostics(latestChecks);
+      const proposal = await propose(root, task, round, maxRounds, promptInventory, context, checkInfo, history);
+      latestSummary = proposal.summary;
+      console.log("Gemini plan: " + proposal.summary);
+      if (!proposal.files.length) {
+        stopReason = proposal.continue ? "Gemini requested another round but proposed no changes." : "No further concrete change proposed.";
+        break;
+      }
       const written = await applyProposal(root, proposal, initiallyClean, initialContents, lastOwned, changed);
       console.log("Changed files: " + written.join(", "));
       latestChecks = checkSet(root);
@@ -414,8 +414,8 @@ async function main(): Promise<void> {
     } catch (error) {
       const message = redact(String(error instanceof Error ? error.message : error)).slice(0, 1200);
       history.push("Round " + round + " stopped safely: " + message);
-      console.error("Proposal was blocked or failed safely: " + message);
-      stopReason = "Stopped after a proposal was rejected or could not be applied.";
+      console.error("Round stopped safely: " + message);
+      stopReason = "Stopped after a Gemini, validation, or verification error.";
       break;
     }
   }
