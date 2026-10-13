@@ -31,7 +31,7 @@ function integer(name: string, fallback: number, min: number, max: number): numb
 }
 function redact(value: string): string {
   return value.replace(/(?:AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,})/g,"[REDACTED_KEY]")
-    .replace(/(GEMINI_API_KEY(?:_[1-4])?|SESSION_SECRET|APP_PASSWORD)\s*[:=]\s*[^\s"' \x60,]+/gi,"$1=[REDACTED]")
+    .replace(/(GEMINI_API_KEY(?:_[1-7])?|SESSION_SECRET|APP_PASSWORD)\s*[:=]\s*[^\s"' \x60,]+/gi,"$1=[REDACTED]")
     .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,"[REDACTED_PRIVATE_KEY]");
 }
 function capture(command: string, args: string[], cwd: string): {status:number|null; stdout:string; stderr:string} {
