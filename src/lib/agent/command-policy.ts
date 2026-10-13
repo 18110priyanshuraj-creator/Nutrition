@@ -26,6 +26,8 @@ const SAFE_NPM_ARGUMENTS = [
   ["run", "build"],
   ["run", "agent", "--", "--help"],
   ["run", "agent", "--", "status"],
+  ["run", "agent:doctor"],
+  ["run", "agent:memory"],
   ["run", "agent:upgrade", "--", "--help"],
 ] as const;
 
