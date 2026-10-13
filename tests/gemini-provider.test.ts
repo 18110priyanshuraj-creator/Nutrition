@@ -75,6 +75,27 @@ describe("Gemini key failover", () => {
     expect(status.activeSlot).toBe("Slot 2");
     expect(JSON.stringify(status)).not.toContain("private-one");
   });
+  it("can try all seven configured slots when six retries are allowed", async () => {
+    const priorRetries = process.env.GEMINI_MAX_RETRIES;
+    process.env.GEMINI_MAX_RETRIES = "6";
+    const sevenKeys: GeminiKeySlot[] = [
+      ...keys,
+      {label: "Slot 5", apiKey: "private-five"},
+      {label: "Slot 6", apiKey: "private-six"},
+      {label: "Slot 7", apiKey: "private-seven"},
+    ];
+    const tried: string[] = [];
+    try {
+      await expect(withGeminiKeyFailover(async (_key, slot) => {
+        tried.push(slot);
+        throw new Error("timeout");
+      }, {keys: sevenKeys, cooldownMs: 1000, now: () => 1_800_000_000_000})).rejects.toMatchObject({category: "timeout"});
+      expect(tried).toEqual(["Slot 1", "Slot 2", "Slot 3", "Slot 4", "Slot 5", "Slot 6", "Slot 7"]);
+    } finally {
+      if (priorRetries === undefined) delete process.env.GEMINI_MAX_RETRIES;
+      else process.env.GEMINI_MAX_RETRIES = priorRetries;
+    }
+  });
   it("stops on a missing model instead of rotating all keys", async () => {
     const tried: string[] = [];
     await expect(withGeminiKeyFailover(async (_key, slot) => {
