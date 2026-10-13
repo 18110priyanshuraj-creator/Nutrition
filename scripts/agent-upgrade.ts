@@ -207,7 +207,8 @@ function sourceContext(root: string, files: Map<string, string>, changed: Set<st
     sections.push("===== " + path + " =====\n" + body);
     remaining -= body.length;
   }
-  return sections.join("\n\n");
+  // Repository contents are untrusted and may contain accidentally committed credentials.
+  return redact(sections.join("\n\n"));
 }
 async function propose(
   root: string,
@@ -264,6 +265,8 @@ async function propose(
 async function applyProposal(
   root: string,
   proposal: Proposal,
+  trackedAtStart: Set<string>,
+  preExistingStatus: Set<string>,
   initiallyClean: Set<string>,
   initialContents: Map<string, string>,
   lastOwned: Map<string, string | null>,
@@ -277,14 +280,20 @@ async function applyProposal(
     if (seen.has(file.path)) throw new Error("Duplicate path in proposal: " + file.path);
     seen.add(file.path);
     if (hasSymlinkAncestor(root, file.path)) throw new Error("Symbolic-link target rejected: " + file.path);
-    if (!initiallyClean.has(file.path) && !lastOwned.has(file.path) && initialContents.has(file.path)) {
-      throw new Error("The path was modified before this run and is protected: " + file.path);
-    }
     const absolute = join(root, file.path);
     let current: string | null = null;
     try { current = await readFile(absolute, "utf8"); } catch { current = null; }
     const hadOwned = lastOwned.has(file.path);
     const owned = lastOwned.get(file.path) ?? null;
+    if (!hadOwned && preExistingStatus.has(file.path)) {
+      throw new Error("The path had pre-existing uncommitted changes or a deletion and is protected: " + file.path);
+    }
+    if (!hadOwned && trackedAtStart.has(file.path) && !initiallyClean.has(file.path)) {
+      throw new Error("The tracked path was not clean when this run started: " + file.path);
+    }
+    if (!hadOwned && !trackedAtStart.has(file.path) && current !== null) {
+      throw new Error("A pre-existing untracked file is protected: " + file.path);
+    }
     const expected = hadOwned ? owned : initialContents.has(file.path) ? initialContents.get(file.path) as string : null;
     if (current !== expected) throw new Error("File changed unexpectedly; refusing to overwrite " + file.path);
     if (current === null && existsSync(absolute)) throw new Error("Could not safely read existing file " + file.path);
@@ -397,7 +406,7 @@ async function main(): Promise<void> {
         stopReason = proposal.continue ? "Gemini requested another round but proposed no changes." : "No further concrete change proposed.";
         break;
       }
-      const written = await applyProposal(root, proposal, initiallyClean, initialContents, lastOwned, changed);
+      const written = await applyProposal(root, proposal, new Set(tracked), statusAtStart, initiallyClean, initialContents, lastOwned, changed);
       console.log("Changed files: " + written.join(", "));
       latestChecks = checkSet(root);
       const score = health(latestChecks);
