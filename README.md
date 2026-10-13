@@ -43,7 +43,7 @@ Set `GEMINI_MODEL` and `GEMINI_API_KEY_1` through `GEMINI_API_KEY_7` in the priv
 
 ## Checks
 
-Run npm test, npm run lint, npm run typecheck, and npm run build. Automated tests do not require Gemini credentials. A passing build does not verify the live API or a production deployment.
+Run `npm test`, `npm run lint`, `npm run typecheck`, and `NODE_ENV=production npm run build` for production-build verification. Next.js sets `NODE_ENV` for each command; do not set it in `.env`. If an existing local `.env` contains `NODE_ENV=development`, explicitly use the production override for a production build. Automated tests do not require Gemini credentials. A passing build does not verify the live API or a production deployment.
 
 ## Health note
 

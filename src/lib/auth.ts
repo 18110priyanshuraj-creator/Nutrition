@@ -14,7 +14,9 @@ export async function isValidSession(token:string|undefined|null):Promise<boolea
  catch{return false;}
 }
 export function securityConfigurationError():string|null {
- if((process.env.APP_PASSWORD??"").length<12)return "Set APP_PASSWORD to a unique value of at least 12 characters.";
- if((process.env.SESSION_SECRET??"").length<32)return "Set SESSION_SECRET to a random value of at least 32 characters.";
+ const appPassword=process.env.APP_PASSWORD??"";
+ if(appPassword.length<12||appPassword==="replace-with-a-long-unique-password-at-least-12-characters")return "Set APP_PASSWORD to a unique value of at least 12 characters.";
+ const sessionSecret=process.env.SESSION_SECRET??"";
+ if(sessionSecret.length<32||sessionSecret==="replace-with-a-random-secret-at-least-32-characters")return "Set SESSION_SECRET to a random value of at least 32 characters.";
  return null;
 }
