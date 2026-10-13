@@ -17,15 +17,13 @@ If git status --short shows files, preserve them before updating. The commands b
 
 ```bash
 git stash push -u -m "backup-before-agent-upgrade-sync"
-git fetch origin
-git merge --ff-only origin/codex/mynutri-ai-foundation
-git stash apply
+git fetch origin && git merge --ff-only origin/codex/mynutri-ai-foundation && git stash apply
 git stash list
 git status --short
 ```
 
-- A fast-forward merge is deliberately used: if the local branch has diverged, Git refuses instead of rewriting history.
-- git stash apply does not delete the backup stash. If Git reports conflicts, stop there; the stash is still available and files are not intentionally discarded.
+- A fast-forward merge is deliberately used: if the local branch has diverged, Git refuses instead of rewriting history. The chained command stops before stash apply when fetch/merge fails.
+- git stash apply does not delete the backup stash. If the merge is refused, stop and leave the stash in place until the branch divergence is reviewed. If stash apply reports conflicts, the stash is still available and files are not intentionally discarded.
 - A stash does not contain ignored files such as .env or data/; it does not delete or replace them.
 
 ## 2. Configure Gemini privately
