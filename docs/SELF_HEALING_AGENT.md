@@ -16,6 +16,8 @@ This is a guarded maintenance CLI added to the existing MyNutri app. It uses the
 
 The background watcher runs only while its process/Codespace remains alive. It skips expensive checks/audits when the repository fingerprint has not changed. On each source change, it runs checks and, when Gemini is configured, a cautious AI bug audit. A scheduled GitHub Actions workflow is separate from this local monitor.
 
+- Run `npm run agent:upgrade` — start the bounded multi-round self-upgrade runner. An optional task can follow `--`, for example `npm run agent:upgrade -- "Improve memory and repair recovery"`.
+
 ## Seven-slot Gemini failover
 
 Configure private server-side environment variables:
