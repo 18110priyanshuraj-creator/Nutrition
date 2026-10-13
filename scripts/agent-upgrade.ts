@@ -164,7 +164,7 @@ function checkSet(root: string): Check[] {
     console.log("\n========== npm run " + name + " ==========");
     const started = Date.now();
     const timeout = integer("AGENT_UPGRADE_CHECK_TIMEOUT_MS", 900000, 60000, 1200000);
-    const result = run(process.platform === "win32" ? "npm.cmd" : "npm", ["run", name], root, timeout);
+    const result = run("npm", ["run", name], root, timeout);
     const output = (result.stdout + "\n" + result.stderr).slice(-12000);
     const ok = result.status === 0;
     console.log(output);
