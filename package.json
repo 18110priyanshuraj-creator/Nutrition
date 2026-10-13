@@ -16,7 +16,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "foods:import": "tsx scripts/import-foods.ts",
     "agent": "tsx scripts/agent.ts",
-    "agent:watch": "tsx scripts/agent.ts watch"
+    "agent:watch": "tsx scripts/agent.ts watch",
+    "agent:upgrade": "tsx scripts/agent-upgrade.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
