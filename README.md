@@ -35,6 +35,7 @@ A guarded local maintenance CLI can run the project's lint, typecheck, test and 
 - Run `npm run agent -- "describe a focused task"` to request a code change.
 - Run `npm run agent:watch` to monitor changes while the Codespace process remains alive.
 - Run `npm run agent:upgrade` for a multi-round Gemini coding-agent upgrade. It can use validated Git/search/test terminal tools, edit multiple eligible files including its own agent core, run checks after each patch, repair failures, retain the best-scoring checkpoint, and reuse verified project memory (up to eight rounds by default).
+- Run `npm run agent:upgrade -- --preflight` before an upgrade to verify that the configured Gemini model, key slots, network access, and permissions work; it sends one tiny request and edits no files.
 - Run `npm run agent -- status` to inspect redacted seven-slot Gemini failover status.
 
 Set `GEMINI_MODEL` and `GEMINI_API_KEY_1` through `GEMINI_API_KEY_7` in the private server environment. The legacy `GEMINI_API_KEY` remains supported when numbered slots are absent. The maintenance command does not create branches, commit, push or merge. The upgrade command can use allowlisted terminal tools and modify its main agent core plus the upgrade runner through a bounded test-and-repair loop, but still preserves pre-existing dirty files, protects auth/database/secrets, and never runs arbitrary model-provided shell commands or pushes/merges. See [the agent guide](docs/SELF_HEALING_AGENT.md) for limits and safety details.
