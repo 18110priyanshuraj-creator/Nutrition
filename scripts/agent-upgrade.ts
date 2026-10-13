@@ -466,6 +466,30 @@ async function writeReport(root: string, report: Record<string, unknown>): Promi
   await mkdir(dirname(path), {recursive: true});
   await writeFile(path, JSON.stringify(report, null, 2) + "\n", {encoding: "utf8", mode: 0o600});
 }
+async function runGeminiPreflight(): Promise<void> {
+  const model = process.env.GEMINI_MODEL?.trim();
+  const keys = configuredGeminiKeys();
+  if (!model) throw new Error("GEMINI_MODEL is missing. Set it in the private Codespace environment.");
+  if (keys.length === 0) throw new Error("No Gemini key slot is configured. Set GEMINI_API_KEY_1 through GEMINI_API_KEY_7 in private Codespace Secrets.");
+  console.log("Testing Google Gemini connectivity and model access.");
+  console.log("Configured model: " + redact(model));
+  console.log("Configured key slots: " + keys.length + " (values hidden)");
+  const response = await withGeminiKeyFailover(async (apiKey) => {
+    const ai = new GoogleGenAI({apiKey, httpOptions: {
+      timeout: integer("GEMINI_REQUEST_TIMEOUT_MS", 60000, 3000, 120000),
+      retryOptions: {attempts: 1},
+    }});
+    return ai.models.generateContent({
+      model,
+      contents: "Reply with OK only.",
+      config: {temperature: 0, maxOutputTokens: 8},
+    });
+  });
+  if (!response.text?.trim()) throw new Error("Gemini connectivity worked, but the model returned no text.");
+  console.log("GEMINI PREFLIGHT: PASS");
+  console.log("Response: " + redact(response.text.trim()).slice(0, 80));
+  console.log("No repository files were edited.");
+}
 async function main(): Promise<void> {
   const root = rootDir();
   const requestedTask = process.argv.slice(2).join(" ").trim();
@@ -474,11 +498,16 @@ async function main(): Promise<void> {
       "Autonomous Gemini coding-agent upgrade (bounded multi-round mode)",
       "npm run agent:upgrade",
       "npm run agent:upgrade -- \"task description\"",
+      "npm run agent:upgrade -- --preflight  # verify Gemini key/model/API access",
       "AGENT_UPGRADE_MAX_ROUNDS=8 (allowed range 1-8)",
       "Runs fixed lint, typecheck, test and build checks after each accepted patch.",
       "Can self-improve the main agent core; does not execute arbitrary model-provided shell commands.",
       "Never commits, pushes or merges. Review git diff before accepting changes.",
     ].join("\n"));
+    return;
+  }
+  if (requestedTask === "--preflight") {
+    await runGeminiPreflight();
     return;
   }
   const task = redact(requestedTask ||
