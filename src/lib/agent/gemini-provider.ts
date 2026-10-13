@@ -41,7 +41,7 @@ function boundedInteger(value: string | undefined, fallback: number, min: number
 /** Reads server-side environment variables only. Raw key values are never returned by status APIs. */
 export function configuredGeminiKeys(env: NodeJS.ProcessEnv = process.env): GeminiKeySlot[] {
   const slots: GeminiKeySlot[] = [];
-  for (let index = 1; index <= 4; index += 1) {
+  for (let index = 1; index <= 7; index += 1) {
     const apiKey = env["GEMINI_API_KEY_" + index]?.trim();
     if (apiKey) slots.push({label: "Slot " + index, apiKey});
   }
@@ -110,7 +110,7 @@ export async function withGeminiKeyFailover<T>(
 ): Promise<T> {
   const keys = options.keys ?? configuredGeminiKeys();
   if (keys.length === 0) {
-    throw new GeminiFailoverError("No Gemini API key is configured. Set GEMINI_API_KEY_1 through GEMINI_API_KEY_4.", "missing_key");
+    throw new GeminiFailoverError("No Gemini API key is configured. Set GEMINI_API_KEY_1 through GEMINI_API_KEY_7.", "missing_key");
   }
   const now = options.now ?? Date.now;
   const cooldownMs = Math.max(1000, Math.min(15 * 60_000, options.cooldownMs ?? boundedInteger(
@@ -179,7 +179,7 @@ export function getGeminiProviderStatus(env: NodeJS.ProcessEnv = process.env): {
 } {
   const configured = configuredGeminiKeys(env);
   const configuredLabels = new Set(configured.map((slot) => slot.label));
-  const statusLabels = ["Slot 1", "Slot 2", "Slot 3", "Slot 4"];
+  const statusLabels = ["Slot 1", "Slot 2", "Slot 3", "Slot 4", "Slot 5", "Slot 6", "Slot 7"];
   if (configured.some((slot) => slot.label === "Legacy fallback")) statusLabels.push("Legacy fallback");
   return {
     provider: "Google Gemini",
