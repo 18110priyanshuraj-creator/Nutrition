@@ -175,7 +175,10 @@ function diagnostics(items: Check[]): string {
 }
 function isAtLeastAsGood(candidate: Check[], best: Check[]): boolean {
   const currentByName = new Map(candidate.map((item) => [item.name, item.ok]));
-  return best.every((item) => !item.ok || currentByName.get(item.name) === true);
+  const preservesPassingChecks = best.every((item) => !item.ok || currentByName.get(item.name) === true);
+  const candidatePassCount = candidate.filter((item) => item.ok).length;
+  const bestPassCount = best.filter((item) => item.ok).length;
+  return preservesPassingChecks && candidatePassCount >= bestPassCount;
 }
 function snapshot(root: string, changed: Set<string>): Promise<FileSnapshot> {
   return Promise.all([...changed].map(async (path) => {
