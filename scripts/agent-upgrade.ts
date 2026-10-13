@@ -510,7 +510,6 @@ async function main(): Promise<void> {
   }
   const baseline = checkSet(root);
   console.log("\nBaseline: " + checkSummary(baseline));
-  let bestHealth = health(baseline);
   let bestChecks = baseline;
   let bestSnapshot: FileSnapshot = new Map();
   const changed = new Set<string>();
@@ -560,10 +559,8 @@ async function main(): Promise<void> {
       const written = await applyProposal(root, proposal, new Set(tracked), statusAtStart, initiallyClean, initialContents, lastOwned, changed);
       console.log("Changed files: " + written.join(", "));
       latestChecks = checkSet(root);
-      const score = health(latestChecks);
       history.push("Round " + round + ": " + proposal.summary + "; changed=" + written.join(", ") + "; checks=" + checkSummary(latestChecks));
       if (isAtLeastAsGood(latestChecks, bestChecks)) {
-        bestHealth = score;
         bestChecks = latestChecks;
         bestSnapshot = await snapshot(root, changed);
       } else {
