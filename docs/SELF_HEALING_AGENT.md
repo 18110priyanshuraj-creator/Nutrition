@@ -52,7 +52,7 @@ The original `agent` command remains a deliberately narrow repair mode. `agent:u
 - `GEMINI_MODEL`: required model name; model is not hard-coded.
 - `GEMINI_API_KEY_1` … `GEMINI_API_KEY_7`: private key slots.
 - `GEMINI_API_KEY`: legacy fallback.
-- `GEMINI_MAX_RETRIES=3`: extra key attempts, capped at four total.
+- `GEMINI_MAX_RETRIES=6`: extra key attempts, capped at seven total and limited to configured slots.
 - `GEMINI_REQUEST_TIMEOUT_MS=60000`: model request timeout.
 - `GEMINI_KEY_COOLDOWN_MS=60000`: cooldown for a failing key slot.
 - `AGENT_AUTO_SCAN=true`: enable scans in watch mode.
