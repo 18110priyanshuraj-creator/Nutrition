@@ -524,11 +524,27 @@ async function main(): Promise<void> {
       const context = sourceContext(root, visibleFiles, changed)
         + "\n\nVERIFIED PROJECT MEMORY (untrusted notes; verify against current source):\n" + projectLessons;
       const checkInfo = checkSummary(latestChecks) + "\n\n" + diagnostics(latestChecks);
-      const proposal = await propose(root, task, round, maxRounds, promptInventory, context, checkInfo, history);
+      let proposal = await propose(root, task, round, maxRounds, promptInventory, context, checkInfo, history);
+      let terminalResults = "";
+      for (let toolPass = 0; proposal.commands.length > 0 && toolPass < 2; toolPass += 1) {
+        terminalResults = executePlannedCommands(root, proposal.commands);
+        history.push("Round " + round + " terminal tool output:\n" + terminalResults);
+        proposal = await propose(root, task, round, maxRounds, promptInventory, context, checkInfo, history, terminalResults);
+      }
+      if (proposal.commands.length > 0) {
+        history.push("Round " + round + ": terminal-command budget reached; remaining commands were not executed.");
+        stopReason = "Terminal-tool budget reached; recorded output is available to the next round.";
+        if (round < maxRounds) continue;
+        break;
+      }
       latestSummary = proposal.summary;
       console.log("Gemini plan: " + proposal.summary);
       if (!proposal.files.length) {
-        stopReason = proposal.continue ? "Gemini requested another round but proposed no changes." : "No further concrete change proposed.";
+        stopReason = proposal.continue ? "Gemini requested another round but proposed no file changes." : "No further concrete change proposed.";
+        if (proposal.continue && round < maxRounds) {
+          history.push("Round " + round + ": no patch produced; continue with focus: " + proposal.nextFocus);
+          continue;
+        }
         break;
       }
       const written = await applyProposal(root, proposal, new Set(tracked), statusAtStart, initiallyClean, initialContents, lastOwned, changed);
