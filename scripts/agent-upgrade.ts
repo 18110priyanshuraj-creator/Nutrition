@@ -126,6 +126,9 @@ function safePath(root: string, path: string): boolean {
   if (!path || path.includes("\0") || isAbsolute(path) || path.includes("\\") || path.startsWith("/")) return false;
   if (path.split("/").some((part) => !part || part === "." || part === "..")) return false;
   if (!SOURCE_EXT.test(path) || !isContained(root, path)) return false;
+  // These static guard tests and toolchain configs must not be editable by the model:
+  // they enforce the safety assumptions that make self-improvement safe to attempt.
+  if (["tests/agent-upgrade-guardrails.test.ts", "vitest.config.ts", "eslint.config.mjs", "next.config.ts"].includes(path)) return false;
   if (/(^|\/)(?:\.env(?:\..*)?|node_modules|\.git|\.next|data|coverage|dist|\.agent|migrations|uploads|photos|exports)(\/|$)/i.test(path)) return false;
   if (/(^|\/)(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|.*\.sqlite.*|.*credentials.*|.*secret.*|.*\.pem|.*\.key)$/i.test(path)) return false;
   if (path === "package.json" || path === "tsconfig.json" || /(^|\/)AGENTS\.md$/i.test(path) || /^\.github\/workflows\//i.test(path)) return false;
