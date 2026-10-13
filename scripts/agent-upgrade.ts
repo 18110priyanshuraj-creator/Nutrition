@@ -9,6 +9,7 @@ import {dirname, isAbsolute, join, relative, resolve, sep} from "node:path";
 import {configuredGeminiKeys, withGeminiKeyFailover} from "../src/lib/agent/gemini-provider";
 import {redactSecrets as redact} from "../src/lib/agent/secret-redaction";
 import {validatePlannedTerminalCommand, type PlannedTerminalCommand} from "../src/lib/agent/command-policy";
+import {isAtLeastAsGood} from "../src/lib/agent/checkpoint-policy";
 
 type Check = {name: string; ok: boolean; output: string; durationMs: number};
 type ProposedFile = {path: string; content: string; reason: string};
@@ -172,13 +173,6 @@ function checkSummary(items: Check[]): string {
 }
 function diagnostics(items: Check[]): string {
   return redact(items.map((item) => "## " + item.name + " " + (item.ok ? "PASS" : "FAIL") + "\n" + item.output.slice(-5000)).join("\n\n")).slice(-24000);
-}
-function isAtLeastAsGood(candidate: Check[], best: Check[]): boolean {
-  const currentByName = new Map(candidate.map((item) => [item.name, item.ok]));
-  const preservesPassingChecks = best.every((item) => !item.ok || currentByName.get(item.name) === true);
-  const candidatePassCount = candidate.filter((item) => item.ok).length;
-  const bestPassCount = best.filter((item) => item.ok).length;
-  return preservesPassingChecks && candidatePassCount >= bestPassCount;
 }
 function snapshot(root: string, changed: Set<string>): Promise<FileSnapshot> {
   return Promise.all([...changed].map(async (path) => {
