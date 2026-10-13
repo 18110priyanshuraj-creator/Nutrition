@@ -46,11 +46,12 @@ const responseJsonSchema = {
     nextFocus: {type: "string"},
     commands: {
       type: "array",
+      maxItems: 4,
       items: {
         type: "object",
         properties: {
           program: {type: "string", enum: ["git", "npm", "rg"]},
-          args: {type: "array", items: {type: "string"}},
+          args: {type: "array", maxItems: 4, items: {type: "string"}},
           reason: {type: "string"},
         },
         required: ["program", "args", "reason"],
