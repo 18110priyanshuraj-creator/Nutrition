@@ -100,8 +100,9 @@ function safePath(root: string, path: string): boolean {
   if (!SOURCE_EXT.test(path) || !isContained(root, path)) return false;
   if (/(^|\/)(?:\.env(?:\..*)?|node_modules|\.git|\.next|data|coverage|dist|\.agent|migrations|uploads|photos|exports)(\/|$)/i.test(path)) return false;
   if (/(^|\/)(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|.*\.sqlite.*|.*credentials.*|.*secret.*|.*\.pem|.*\.key)$/i.test(path)) return false;
-  if (path === "package.json" || path === "tsconfig.json" || path === "AGENTS.md" || path === "scripts/agent-upgrade.ts" || /^\.github\/workflows\//i.test(path)) return false;
-  if (/^app\/api\/(?:auth|restore)\//i.test(path) || /^src\/lib\/(?:auth|db)(?:\.|\/)/i.test(path)) return false;
+  if (path === "package.json" || path === "tsconfig.json" || /(^|\/)AGENTS\.md$/i.test(path) || path === "scripts/agent-upgrade.ts" || /^\.github\/workflows\//i.test(path)) return false;
+  if (/(^|\/)(?:auth|authentication|session|sessions|migrations?|schema|secrets?)(?:\/|\.|$)/i.test(path)) return false;
+  if (/^app\/api\/restore\//i.test(path) || /^src\/lib\/db(?:\.|\/)/i.test(path)) return false;
   return true;
 }
 function hasSymlinkAncestor(root: string, path: string): boolean {
