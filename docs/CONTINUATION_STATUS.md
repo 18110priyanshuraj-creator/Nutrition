@@ -71,7 +71,38 @@ The labels below distinguish source inspection from actual execution. **No appli
 2. Run the newly added food-import regression test and the full existing suite. The code/test commits have not been executed locally; no passing result is claimed.
 3. Review importer edge cases: unsupported keys are now rejected, but duplicate food names, unusual but syntactically valid values, and dataset-specific transformations still need review/tests. Verify a real dataset's source/terms independently before marking any record verified.
 4. Add missing route coverage for login/session expiry, authorization on private routes, analysis schema/file handling and Gemini failures, profile/target validation, measurements/date ranges, normal meal CRUD, and explicit data deletion.
-5. Audit `app/api/profile/route.ts` target validation and any date/range input handling; verify that only defined nutrient keys and coherent min/target/max combinations can be stored.
+5. Audit `app/api/profile/route.ts` target validation and any date/range input handl
+
+## Recovery update — 2026-10-13 (Asia/Kolkata)
+
+### Verified local fix
+
+The actual runtime bug discovered in the recovered branch was that the CLI agent and maintenance scripts only loaded `.env` and ignored the private `.env.local` file. That meant `npm run agent -- status` and other maintenance commands reported Gemini slots as unconfigured even when local secret values existed and the app itself was reading them.
+
+I fixed that by introducing a safe local-env loader used by the CLI scripts before they evaluate the provider status or run maintenance flows. The loader preserves Codespaces/runtime values as the highest-priority source and uses `.env.local` to override the repository-level `.env` file when present.
+
+### Code changes and regression test
+
+- `scripts/configure-local.ts` — exposed a reusable local env loader
+- `scripts/agent.ts` — calls the loader before provider status checks and repair tasks
+- `scripts/agent-upgrade.ts` — same fix for autonomous upgrade tasks
+- `scripts/migrate.ts` — ensures the local private env is loaded for database work
+- `scripts/import-foods.ts` — same fix for import tasks
+- `tests/local-config.test.ts` — new regression test covering `.env.local` precedence and process-env override behavior
+
+### Verified command results
+
+- `npx vitest run tests/local-config.test.ts tests/gemini-provider.test.ts` — passed (`17` tests)
+- `npm run agent -- status` — passed and reported `configured: true` with all slots present
+- `npm test` — passed (`20` test files, `72` tests)
+- `npm run lint` — passed
+- `npm run typecheck` — passed
+- `npm run build` — passed
+- `curl http://localhost:3000/api/health` — returned `{"status":"ok","database":"sqlite","geminiConfigured":true,"timeZone":"Asia/Kolkata"}`
+
+### Current blocker
+
+The repository is locally verified, but the final remote push and GitHub Actions confirmation remain blocked by missing GitHub authentication in this execution environment (`fatal: unable to get password from user`).ing; verify that only defined nutrient keys and coherent min/target/max combinations can be stored.
 6. Execute migrations on disposable fresh and older-schema databases; verify existing records survive upgrades. Back up any real database before schema changes, import, restore, or deletion.
 7. Run lint, typecheck, tests, production build, UI smoke checks and a health check in an environment with dependencies installed.
 8. Do not report live Gemini or production deployment as complete without an actual successful test.

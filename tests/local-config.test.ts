@@ -1,6 +1,9 @@
+import {mkdtempSync, writeFileSync} from "node:fs";
+import {tmpdir} from "node:os";
+import {join} from "node:path";
 import {describe, expect, it} from "vitest";
 import {parse} from "dotenv";
-import {encodeEnvValue, mergeEnvText} from "../scripts/configure-local";
+import {encodeEnvValue, loadPrivateEnvFiles, mergeEnvText} from "../scripts/configure-local";
 
 describe("local secrets configuration helpers", () => {
   it("updates only selected settings and preserves unrelated env lines", () => {
@@ -33,5 +36,28 @@ describe("local secrets configuration helpers", () => {
 
   it("rejects line breaks instead of writing a second dotenv assignment", () => {
     expect(() => encodeEnvValue("first-line\nAPP_PASSWORD=unsafe")).toThrow(/line breaks/);
+  });
+
+  it("loads .env.local credentials for CLI scripts while preserving runtime overrides", () => {
+    const original = {...process.env};
+    const root = mkdtempSync(join(tmpdir(), "mynutri-env-"));
+    writeFileSync(join(root, ".env"), "GEMINI_MODEL=base-model\nGEMINI_API_KEY_1=base-key\n");
+    writeFileSync(join(root, ".env.local"), "GEMINI_MODEL=local-model\nGEMINI_API_KEY_1=local-key\nGEMINI_API_KEY_2=local-key-2\n");
+    process.env.GEMINI_MODEL = "runtime-model";
+    process.env.GEMINI_API_KEY_1 = "runtime-key";
+    const priorCwd = process.cwd();
+    try {
+      process.chdir(root);
+      loadPrivateEnvFiles(root);
+      expect(process.env.GEMINI_MODEL).toBe("runtime-model");
+      expect(process.env.GEMINI_API_KEY_1).toBe("runtime-key");
+      expect(process.env.GEMINI_API_KEY_2).toBe("local-key-2");
+    } finally {
+      process.chdir(priorCwd);
+      for (const key of Object.keys(process.env)) {
+        if (!(key in original)) delete process.env[key];
+      }
+      Object.assign(process.env, original);
+    }
   });
 });

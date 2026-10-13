@@ -1,4 +1,5 @@
-import "dotenv/config";
+import {loadPrivateEnvFiles} from "./configure-local";
+loadPrivateEnvFiles(process.cwd());
 import {readFileSync} from "node:fs";
 import {z} from "zod";
 import {getDb} from "../src/lib/db";

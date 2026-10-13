@@ -1,4 +1,5 @@
-import "dotenv/config";
+import {loadPrivateEnvFiles} from "./configure-local";
+loadPrivateEnvFiles(process.cwd());
 import {GoogleGenAI} from "@google/genai";
 import {z} from "zod";
 import {createHash} from "node:crypto";

@@ -5,7 +5,7 @@ import {join, resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 import {spawnSync} from "node:child_process";
 import {emitKeypressEvents, createInterface} from "node:readline";
-import {parse} from "dotenv";
+import {config as loadDotenv, parse} from "dotenv";
 
 const slotNames = Array.from({length: 7}, (_, index) => `GEMINI_API_KEY_${index + 1}`);
 const placeholderPassword = "replace-with-a-long-unique-password-at-least-12-characters";
@@ -53,13 +53,25 @@ export function mergeEnvText(
   return output.length ? output.join("\n") + "\n" : "";
 }
 
-function readEnvFile(path: string): Record<string, string> {
+export function readEnvFile(path: string): Record<string, string> {
   try {
     return parse(readFileSync(path));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
     throw error;
   }
+}
+
+export function loadPrivateEnvFiles(root = process.cwd()): NodeJS.ProcessEnv {
+  const runtime = {...process.env};
+  for (const [index, file] of [join(root, ".env"), join(root, ".env.local")].entries()) {
+    if (!existsSync(file)) continue;
+    loadDotenv({path: file, override: index > 0});
+  }
+  for (const [key, value] of Object.entries(runtime)) {
+    process.env[key] = value;
+  }
+  return process.env;
 }
 
 function ignoredLocalFile(root: string): boolean {
