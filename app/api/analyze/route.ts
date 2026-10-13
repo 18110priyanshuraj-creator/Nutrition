@@ -65,7 +65,7 @@ export async function POST(request:NextRequest){
  const catalog=foodList() as unknown as Array<{id:string;name:string;aliases:string[];nutrients:Record<string,number>}>;
  const model=process.env.GEMINI_MODEL;
  if(!hasGeminiKey()||!model){
-  if(imageData)return NextResponse.json({error:"Photo recognition needs GEMINI_API_KEY and GEMINI_MODEL. Manual food selection still works; the photo was not saved."},{status:503});
+  if(imageData)return NextResponse.json({error:"Photo recognition needs GEMINI_MODEL and at least one server-side key slot (GEMINI_API_KEY_1 through GEMINI_API_KEY_7). Manual food selection still works; the photo was not saved."},{status:503});
   const matched=parseKnownFoods(text,catalog);
   if(!matched.length)return NextResponse.json({error:"Gemini is not configured and no catalog food name could be matched. Select foods manually or configure the server-side Gemini settings."},{status:503});
   return NextResponse.json({mode:"local_match",summary:"Local food-name matches only; this was not a Gemini analysis.",warning:"Review each match and quantity. Household portions are estimates.",candidates:matched.map((c)=>({foodId:c.foodId,foodName:c.name,grams:c.grams,portionEstimated:c.estimated,confidence:c.confidence,notes:c.note}))});
