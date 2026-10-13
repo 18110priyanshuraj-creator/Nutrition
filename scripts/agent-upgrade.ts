@@ -100,13 +100,13 @@ function safePath(root: string, path: string): boolean {
   if (!SOURCE_EXT.test(path) || !isContained(root, path)) return false;
   if (/(^|\/)(?:\.env(?:\..*)?|node_modules|\.git|\.next|data|coverage|dist|\.agent|migrations|uploads|photos|exports)(\/|$)/i.test(path)) return false;
   if (/(^|\/)(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|.*\.sqlite.*|.*credentials.*|.*secret.*|.*\.pem|.*\.key)$/i.test(path)) return false;
-  if (path === "package.json" || path === "tsconfig.json" || path === "AGENTS.md" || /^\.github\/workflows\//i.test(path)) return false;
+  if (path === "package.json" || path === "tsconfig.json" || path === "AGENTS.md" || path === "scripts/agent-upgrade.ts" || /^\.github\/workflows\//i.test(path)) return false;
   if (/^app\/api\/(?:auth|restore)\//i.test(path) || /^src\/lib\/(?:auth|db)(?:\.|\/)/i.test(path)) return false;
   return true;
 }
 function hasSymlinkAncestor(root: string, path: string): boolean {
   let current = root;
-  for (const part of path.split("/").slice(0, -1)) {
+  for (const part of path.split("/")) {
     current = join(current, part);
     if (!existsSync(current)) continue;
     try {
@@ -263,9 +263,11 @@ async function applyProposal(
   initiallyClean: Set<string>,
   initialContents: Map<string, string>,
   lastOwned: Map<string, string | null>,
+  changed: Set<string>,
 ): Promise<string[]> {
   const changes = new Map<string, string>();
   const seen = new Set<string>();
+  const before = new Map<string, {content: string | null; hadOwned: boolean; owned: string | null; wasChanged: boolean}>();
   for (const file of proposal.files) {
     if (!safePath(root, file.path)) throw new Error("Unsafe or protected path rejected: " + file.path);
     if (seen.has(file.path)) throw new Error("Duplicate path in proposal: " + file.path);
@@ -277,29 +279,50 @@ async function applyProposal(
     const absolute = join(root, file.path);
     let current: string | null = null;
     try { current = await readFile(absolute, "utf8"); } catch { current = null; }
-    const expected = lastOwned.has(file.path)
-      ? lastOwned.get(file.path)
-      : initialContents.has(file.path) ? initialContents.get(file.path) as string : null;
+    const hadOwned = lastOwned.has(file.path);
+    const owned = lastOwned.get(file.path) ?? null;
+    const expected = hadOwned ? owned : initialContents.has(file.path) ? initialContents.get(file.path) as string : null;
     if (current !== expected) throw new Error("File changed unexpectedly; refusing to overwrite " + file.path);
     if (current === null && existsSync(absolute)) throw new Error("Could not safely read existing file " + file.path);
     if (current === file.content) continue;
     if (isSecretLike(file.content)) throw new Error("Rejected possible secret in generated content for " + file.path);
     if (file.content.length > 140000) throw new Error("Generated file exceeds the size limit: " + file.path);
+    before.set(file.path, {content: current, hadOwned, owned, wasChanged: changed.has(file.path)});
     changes.set(file.path, file.content);
   }
   if (changes.size === 0) throw new Error("Gemini proposed no actual file changes.");
   if ([...changes.values()].reduce((sum, value) => sum + value.length, 0) > 500000) {
     throw new Error("Generated patch exceeds the aggregate size limit.");
   }
-  for (const [path, value] of changes) {
-    const absolute = join(root, path);
-    await mkdir(dirname(absolute), {recursive: true});
-    await writeFile(absolute, value, {encoding: "utf8", flag: "w"});
-    lastOwned.set(path, value);
+  try {
+    for (const [path, value] of changes) {
+      const absolute = join(root, path);
+      await mkdir(dirname(absolute), {recursive: true});
+      await writeFile(absolute, value, {encoding: "utf8", flag: "w"});
+      lastOwned.set(path, value);
+      changed.add(path);
+    }
+    const diffCheck = run("git", ["diff", "--check"], root);
+    if (diffCheck.status !== 0) throw new Error("Generated changes failed git diff --check: " + diffCheck.stderr);
+    return [...changes.keys()];
+  } catch (error) {
+    for (const [path, old] of [...before.entries()].reverse()) {
+      const absolute = join(root, path);
+      let current: string | null = null;
+      try { current = await readFile(absolute, "utf8"); } catch { current = null; }
+      if (current !== changes.get(path)) {
+        console.warn("Could not roll back " + path + " because it changed unexpectedly.");
+        continue;
+      }
+      if (old.content === null) await rm(absolute, {force: true});
+      else await writeFile(absolute, old.content, "utf8");
+      if (old.hadOwned) lastOwned.set(path, old.owned);
+      else lastOwned.delete(path);
+      if (old.wasChanged) changed.add(path);
+      else changed.delete(path);
+    }
+    throw error;
   }
-  const diffCheck = run("git", ["diff", "--check"], root);
-  if (diffCheck.status !== 0) throw new Error("Generated changes failed git diff --check: " + diffCheck.stderr);
-  return [...changes.keys()];
 }
 async function writeReport(root: string, report: Record<string, unknown>): Promise<void> {
   const path = join(root, ".agent", "upgrade-report.json");
@@ -359,8 +382,7 @@ async function main(): Promise<void> {
       break;
     }
     try {
-      const written = await applyProposal(root, proposal, initiallyClean, initialContents, lastOwned);
-      written.forEach((path) => changed.add(path));
+      const written = await applyProposal(root, proposal, initiallyClean, initialContents, lastOwned, changed);
       console.log("Changed files: " + written.join(", "));
       latestChecks = checkSet(root);
       const score = health(latestChecks);
