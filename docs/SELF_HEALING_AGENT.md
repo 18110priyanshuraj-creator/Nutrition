@@ -24,6 +24,9 @@ Configure private server-side environment variables:
 - `GEMINI_API_KEY_2`
 - `GEMINI_API_KEY_3`
 - `GEMINI_API_KEY_4`
+- `GEMINI_API_KEY_5`
+- `GEMINI_API_KEY_6`
+- `GEMINI_API_KEY_7`
 - `GEMINI_MODEL`
 
 The previous `GEMINI_API_KEY` variable remains a fallback when no numbered slot is set. Never commit secret values or expose them in logs.
@@ -37,7 +40,7 @@ The original `agent` command remains a deliberately narrow repair mode. `agent:u
 - The agent operates on the current checked-out branch only. It never creates branches, commits, pushes, or merges.
 - Existing uncommitted and untracked work is preserved. A tracked file already modified by a person is ineligible for an automatic patch.
 - The original repair mode edits only clean existing TypeScript/TSX app/test files and protects agent core. The upgrade mode can edit eligible clean source files including `scripts/agent.ts` and `src/lib/agent/`, plus create new source/test files. Auth/session, database/schema/migrations, restore endpoints, environment files, package/lock configuration, workflows and the upgrade runner itself remain protected.
-- Each candidate patch must pass `git diff --check`, lint, typecheck, tests and production build. When verification fails, only that patch is reverted, and only if the file still exactly matches the agent's proposal.
+- The original repair mode verifies a proposed patch with `git diff --check`, lint, typecheck, tests and production build, and reverts failed patches when the files still match its proposal. The upgrade mode runs these checks after each round, sends failure diagnostics into subsequent rounds, and restores its best-scoring checkpoint if a later round regresses.
 - The original repair mode makes at most three repair attempts by default. The upgrade mode runs up to four plan/edit/verify rounds by default and may be configured between one and eight rounds. A passing repair remains uncommitted on the current branch so the diff can be reviewed first.
 - The local `.agent/memory.json` stores bounded run summaries and lessons from verified, passing repairs. It does not store API keys, meal records, photos, database contents or full diagnostic output. The original maintenance mode cannot edit the agent core; the separate upgrade mode can improve the main agent core but cannot edit its own upgrade runner.
 - This is guarded automation, not a promise that every issue can be repaired automatically. Review generated diffs before committing.
@@ -45,7 +48,7 @@ The original `agent` command remains a deliberately narrow repair mode. `agent:u
 ## Environment controls
 
 - `GEMINI_MODEL`: required model name; model is not hard-coded.
-- `GEMINI_API_KEY_1` … `GEMINI_API_KEY_4`: private key slots.
+- `GEMINI_API_KEY_1` … `GEMINI_API_KEY_7`: private key slots.
 - `GEMINI_API_KEY`: legacy fallback.
 - `GEMINI_MAX_RETRIES=3`: extra key attempts, capped at four total.
 - `GEMINI_REQUEST_TIMEOUT_MS=60000`: model request timeout.
