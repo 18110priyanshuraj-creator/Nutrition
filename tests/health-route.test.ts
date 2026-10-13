@@ -1,7 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {GET} from "../app/api/health/route";
 
-vi.mock("../src/lib/db", () => ({
+vi.mock("@/lib/db", () => ({
   getDb: () => ({prepare: () => ({get: () => ({ok: 1})})}),
 }));
 
