@@ -44,7 +44,7 @@ const responseJsonSchema = {
 };
 
 const CHECK_NAMES = ["lint", "typecheck", "test", "build"] as const;
-const SOURCE_EXT = /\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|css)$/i;
+const SOURCE_EXT = /\.(?:ts|tsx|js|jsx|mjs|cjs|md|css)$/i;
 const SECRET_PATTERN = /(?:AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,}|GOCSPX-[0-9A-Za-z_-]{18,})/;
 
 function integer(name: string, fallback: number, min: number, max: number): number {
