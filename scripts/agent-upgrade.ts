@@ -175,7 +175,7 @@ async function restoreSnapshot(root: string, state: FileSnapshot, lastOwned: Map
   }
   return warnings;
 }
-function inventory(root: string, paths: string[]): string {
+function inventory(paths: string[]): string {
   return paths.map((path) => path).sort().join("\n");
 }
 function sourceContext(root: string, files: Map<string, string>, changed: Set<string>, budget = 62000): string {
@@ -377,7 +377,7 @@ async function main(): Promise<void> {
       try { visibleFiles.set(path, await readFile(join(root, path), "utf8")); }
       catch { visibleFiles.delete(path); }
     }
-    const promptInventory = inventory(root, [...new Set([...visibleFiles.keys(), ...changed])]);
+    const promptInventory = inventory([...new Set([...visibleFiles.keys(), ...changed])]);
     const context = sourceContext(root, visibleFiles, changed);
     const checkInfo = checkSummary(latestChecks) + "\n\n" + diagnostics(latestChecks);
     const proposal = await propose(root, task, round, maxRounds, promptInventory, context, checkInfo, history);
