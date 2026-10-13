@@ -80,8 +80,9 @@ function integer(name: string, fallback: number, min: number, max: number): numb
 }
 function redact(value: string): string {
   return value
-    .replace(/(?:AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,}|GOCSPX-[0-9A-Za-z_-]{18,})/g, "[REDACTED_KEY]")
-    .replace(/(GEMINI_API_KEY(?:_[1-7])?|SESSION_SECRET|APP_PASSWORD)\s*[:=]\s*[^\s"' \x60,]+/gi, "$1=[REDACTED]")
+    .replace(/(?:AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,}|GOCSPX-[0-9A-Za-z_-]{18,}|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{25,}|sk-[A-Za-z0-9_-]{20,})/g, "[REDACTED_KEY]")
+    .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]{16,}={0,2}/gi, "Bearer [REDACTED]")
+    .replace(/(\b[A-Z0-9_]*(?:API[_-]?KEY|APIKEY|ACCESS[_-]?TOKEN|AUTH[_-]?TOKEN|TOKEN|SECRET|PASSWORD|CREDENTIALS?|PRIVATE[_-]?KEY)[A-Z0-9_]*\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s"'\x60,;]+)/gi, "$1[REDACTED]")
     .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, "[REDACTED_PRIVATE_KEY]");
 }
 function run(command: string, args: string[], cwd: string, timeoutMs = 30000): {status: number | null; stdout: string; stderr: string} {
