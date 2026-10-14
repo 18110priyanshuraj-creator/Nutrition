@@ -1,10 +1,18 @@
 # MyNutri AI
 
-Personal nutrition tracker with SQLite persistence, server-side Gemini food proposals, editable food logging, a daily dashboard, history, measurements, recommendations, and data export.
+Personal nutrition tracker with SQLite persistence, server-side Gemini food recognition, one-action text meal logging, a daily dashboard, history, measurements, recommendations, and data export.
 
 ## Data quality limitation
 
 The starter catalog intentionally contains a small set of provisional generic estimates, not verified ICMR-NIN/IFCT rows. Missing nutrients remain unknown, not zero. Before relying on comprehensive micronutrient totals, import or verify records against a suitable licensed, traceable composition source. The application stores source labels and confidence so values can be audited. Do not present the seed catalog as complete.
+
+## Food logging and portion estimates
+
+In **Log Food**, enter a meal in English, Hindi, or Hinglish and choose **Analyze & log meal**. Catalog-matched, sufficiently confident foods are saved directly; unresolved foods remain unlogged and appear in the nearby correction card. A collapsed manual-entry fallback is available when AI is unavailable or when you choose it. The saved card shows the original description, date/category, portion provenance, available nutrient totals, and diary/edit/undo actions.
+
+Each submission uses a unique idempotency key: retries return the canonical saved meal instead of adding duplicate records, while logging the same meal intentionally later uses a new key.
+
+Explicit gram quantities are retained as entered. Supported household portions use food-specific estimates rather than a universal piece weight: for example, the almond and edible walnut-kernel estimates cite USDA FoodData Central SR Legacy records 170567 and 170187, respectively. Other household measures (including amla, roti, cooked rice, dal, and milk) are provisional editable estimates; they are not official composition data. Ambiguous or unsupported portions remain unlogged until corrected. AI-proposed nutrients are never used to calculate totals.
 
 ## Requirements and setup
 
@@ -48,7 +56,7 @@ Set `GEMINI_MODEL` and `GEMINI_API_KEY_1` through `GEMINI_API_KEY_7` in the priv
 
 ## Checks
 
-Run `npm test`, `npm run lint`, `npm run typecheck`, and `NODE_ENV=production npm run build` for production-build verification. Next.js sets `NODE_ENV` for each command; do not set it in `.env`. If an existing local `.env` contains `NODE_ENV=development`, explicitly use the production override for a production build. Automated tests do not require Gemini credentials. A passing build does not verify the live API or a production deployment.
+Run `npm test`, `npm run lint`, `npm run typecheck`, and `NODE_ENV=production npm run build` for production-build verification. Next.js sets `NODE_ENV` for each command; do not set it in `.env`. If an existing local `.env` contains `NODE_ENV=development`, explicitly use the production override for a production build. Automated tests do not require Gemini credentials. Database smoke tests use disposable temporary SQLite databases and do not modify the configured personal database. A passing build does not verify the live API or a production deployment.
 
 ## Health note
 

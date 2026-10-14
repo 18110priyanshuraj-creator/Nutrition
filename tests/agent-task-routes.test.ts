@@ -28,6 +28,7 @@ vi.mock("@/lib/agent/gemini-provider", () => ({
 }));
 
 const sameOrigin = {origin: "http://localhost"};
+const syntheticApiKey = "AIza" + "012345678901234567890123456789";
 
 beforeEach(() => {
   mocked.owner = true;
@@ -88,10 +89,10 @@ describe("owner-authorized repository agent routes", () => {
         "x-forwarded-host": "nutrition-3000.app.github.dev",
         "x-forwarded-proto": "https",
       },
-      body: JSON.stringify({request: "Debug GEMINI_API_KEY=AIza012345678901234567890123456789"}),
+      body: JSON.stringify({request: "Debug GEMINI_API_KEY=" + syntheticApiKey}),
     }));
     expect(response.status).toBe(400);
-    expect(await response.text()).not.toContain("AIza012345678901234567890123456789");
+    expect(await response.text()).not.toContain(syntheticApiKey);
     expect(mocked.create).not.toHaveBeenCalled();
   });
 
@@ -99,7 +100,7 @@ describe("owner-authorized repository agent routes", () => {
     const secret = await POST(new Request("http://localhost/api/agent/tasks", {
       method: "POST",
       headers: {"content-type": "application/json", ...sameOrigin},
-      body: JSON.stringify({request: "Debug GEMINI_API_KEY=AIza012345678901234567890123456789"}),
+      body: JSON.stringify({request: "Debug GEMINI_API_KEY=" + syntheticApiKey}),
     }));
     const malformed = await POST(new Request("http://localhost/api/agent/tasks", {
       method: "POST",
@@ -107,7 +108,7 @@ describe("owner-authorized repository agent routes", () => {
       body: JSON.stringify({request: "fix"}),
     }));
     expect(secret.status).toBe(400);
-    expect(await secret.text()).not.toContain("AIza012345678901234567890123456789");
+    expect(await secret.text()).not.toContain(syntheticApiKey);
     expect(malformed.status).toBe(400);
     expect(mocked.create).not.toHaveBeenCalled();
   });

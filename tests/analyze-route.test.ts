@@ -13,7 +13,11 @@ vi.mock("@google/genai", () => ({
 
 vi.mock("@/lib/server-auth", () => ({requireOwner: async () => null}));
 vi.mock("@/lib/server-data", () => ({
-  foodList: () => [{id: "banana-raw", name: "Banana, raw", aliases: ["banana"], nutrients: {kcal: 89}}],
+  foodList: () => [
+    {id: "banana-raw", name: "Banana, raw", aliases: ["banana"], nutrients: {kcal: 89}},
+    {id: "almonds", name: "Almonds", aliases: ["almonds", "badam", "बादाम"], nutrients: {kcal: 579}},
+    {id: "moringa", name: "Moringa leaves, dry powder", aliases: ["moringa dry powder"], nutrients: {}},
+  ],
 }));
 
 const envNames = [
@@ -74,7 +78,32 @@ describe("food analysis without Gemini credentials", () => {
   });
 });
 
-describe("food-photo proposal through the shared Gemini keyring", () => {
+describe("food analysis through the shared Gemini keyring", () => {
+  it("uses supported text portions instead of implausible model weights", async () => {
+    process.env.GEMINI_API_KEY_1 = "private-photo-test-key";
+    process.env.GEMINI_MODEL = "gemini-3.5-flash-lite";
+    mocked.generateContent.mockResolvedValue({
+      text: JSON.stringify({
+        items: [
+          {foodName: "Almonds", amount: 240, unit: "g", preparation: "raw", confidence: "high", notes: ""},
+          {foodName: "Moringa leaves, dry powder", amount: 400, unit: "g", preparation: "dry powder", confidence: "high", notes: ""},
+        ],
+        summary: "Two foods",
+      }),
+    });
+
+    const response = await POST(request("6 almonds and 20 g moringa dry powder"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.candidates).toMatchObject([
+      {foodId: "almonds", grams: 7.2, amount: 6, unit: "piece", portionEstimated: true},
+      {foodId: "moringa", grams: 20, amount: 20, unit: "g", portionEstimated: false},
+    ]);
+    expect(body.candidates[0].portionNote).toContain("USDA FoodData Central");
+    expect(body.warning).toContain("take precedence over model portions");
+  });
+
   it("sends validated image bytes to Gemini and returns an editable proposal without saving", async () => {
     process.env.GEMINI_API_KEY_1 = "private-photo-test-key";
     process.env.GEMINI_MODEL = "gemini-3.5-flash-lite";

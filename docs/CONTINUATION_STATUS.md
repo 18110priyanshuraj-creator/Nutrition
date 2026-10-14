@@ -291,3 +291,53 @@ All six deleted remote tips were re-read immediately before deletion, verified a
 | Local worktree | PRESERVED — the primary `codex/nutrition-completion-20261013` worktree still has its pre-existing uncommitted `docs/CONTINUATION_STATUS.md` edit. The integration worktree is retained at the published `main` content. |
 
 No application source changes were needed during this final consolidation. Existing application, migration, safety, and regression-test work from all verified source branches is preserved in `main`. Do not claim the provider, real-photo recognition, comprehensive official food data, accessibility, or production deployment is fully verified.
+
+## Current completion run — 2026-10-14 (Asia/Kolkata)
+
+This section supersedes earlier statements above where this run produced newer evidence. Historical reports are retained.
+
+### Branch and workspace
+
+- The checked-out branch is `codex/nutrition-completion-20261013`. Before local implementation changes, `HEAD` and fetched `origin/main` were both `859c7c89b8b6fbb659b0beba5f9e34e532219cca`; no local fast-forward was needed.
+- The remote development ref was `8ba1c5b82fc7e3ba5daa2f8616f3815dd27ed836`, 38 commits behind the local branch. The local branch remains based on the current `main`; the existing local integration worktree and all pre-existing dirty files were preserved.
+- No new branch, repository, or Codespace was created. At the time of this update, the new working-tree changes had not yet been committed or pushed; the existing PR lookup found no open PR from this branch.
+- `next-env.d.ts` is restored to its original `.next/dev` references after builds. No environment file, database, WAL file, photo, export, private log, or generated output is included in the working-tree change list.
+
+### Application and portion changes
+
+- Food text entry has one primary **Analyze & log meal** action. Safe catalog matches are saved directly and displayed near the input; ambiguous items remain unlogged with an inline correction path. Manual entry is a collapsed fallback.
+- Meal writes are transactional and retain the original description, date/category, canonical saved result, and portion provenance. A server-validated per-submission idempotency key returns the existing saved meal on retry; later intentional submissions use a fresh key. Duplicate and partial-failure behavior is covered by disposable SQLite route tests.
+- Text-parsed supported quantities override model-proposed weights. Regression tests cover six almonds, walnut kernels/halves, 20 g dry moringa, amla, roti, katori, cooked rice, dal, milk, Hindi/Hinglish quantities, and unsupported or implausible amounts.
+- Almond and edible walnut-kernel reference notes cite USDA FoodData Central SR Legacy records 170567 and 170187. Other household weights remain provisional, editable estimates—not verified IFCT/ICMR-NIN values. Missing nutrients remain unknown.
+
+### Repository agent changes and live task evidence
+
+- Both guarded agent runners now prioritize complete task-named files within a bounded context. Multi-file changes remain size/path/symlink/secret checked, and dirty-file additions/removals are still protected by the existing diff-preservation guard.
+- Build checks use isolated `.next-agent-check` output. Route-import-only changes generated in `next-env.d.ts` are restored safely; other changes are not overwritten.
+- In-app task completion now snapshots bounded fingerprints for eligible dirty project files and compares final fingerprints, so edits to files already dirty at task start can appear in `changedFiles`. File contents and protected paths are not stored in that baseline. Regression tests cover dirty-file changes, additions/removals, compatibility with older path-only task records, and invalid snapshots.
+- A genuine authenticated in-app Gemini task (`3b2f95a6-b1c3-4102-8f03-674aa103e452`) succeeded on the existing branch, changed `README.md` and `tests/database-smoke.test.ts`, and reported lint, typecheck, tests, and build all passing. At that time the task response incorrectly showed an empty `changedFiles` list; the actual working-tree diff confirmed both files changed. This prompted the fingerprint correction above.
+- Subsequent genuine tasks submitted to verify the corrected reporting were safely refused before writes because the proposed full-file replacements conflicted with pre-existing dirty edits; one proposal was also rejected by the secret-pattern guard. Those tasks did not modify files. The fingerprint comparison is unit-tested, but successful post-fix end-to-end filename reporting remains **NOT VERIFIED**.
+- Test-only API-key text in `tests/agent-task-routes.test.ts` is now assembled from fragments at runtime so the same redaction test runs without embedding a contiguous credential-shaped string. Runtime test coverage and secret guards remain enabled.
+
+### Verification and preview
+
+| Check | Result |
+|---|---|
+| `npm test` | PASS — 24 files, 122 tests. |
+| `npm run lint` | PASS. |
+| `npm run typecheck` | PASS. |
+| `npm run build` | PASS — normal `.next` production build; no Turbopack tracing warnings. |
+| `npm run agent:doctor` | PASS — lint, typecheck, tests, and isolated production build. |
+| `npm run agent -- --help` | PASS. |
+| `npm ls --depth=0` | Exit 0; two extraneous platform packages reported (`@emnapi/runtime`, `@img/sharp-wasm32`); no dependency/lockfile change. |
+| Disposable SQLite migrations/persistence | PASS in the automated database smoke tests; real nutrition records were not reset or migrated. |
+| Real bounded Gemini provider preflight and synthetic food analysis/save/retry/history/undo | PASS earlier in this run using the configured server-side provider and isolated preview database; credentials and private food history were not printed or sent. |
+| Local preview | PASS on port 3000: `/login` and `/api/health` returned HTTP 200. The forwarded URL is `https://obscure-giggle-r765jvjjgwjj25gpx-3000.app.github.dev`; an unauthenticated forwarded request redirected to login. |
+| Browser accessibility automation, real user food/photo recognition, public production deployment | NOT RUN / NOT VERIFIED. |
+
+The existing Codespace preview remains running against `/tmp/mynutri-codespace-preview-20261014.sqlite`; this is a development preview, not permanent public hosting. No real user meal/photo was submitted.
+
+### Publication state at this update
+
+- `git diff --check` passes, and the local source has passed the checks above.
+- The branch has not yet been committed or pushed in this run. No PR, remote CI run, merge, or permanent deployment is claimed here; record those outcomes only after the corresponding GitHub operations are completed and verified.

@@ -1,0 +1,110 @@
+.result {
+  margin-top: 14px;
+  scroll-margin-top: 18px;
+}
+
+.totals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.metric {
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--soft);
+}
+
+.metric span,
+.metric strong {
+  display: block;
+}
+
+.metric span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.metric strong {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+}
+
+.completeness {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.original {
+  margin: 10px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.original summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.original p {
+  overflow-wrap: anywhere;
+}
+
+.items {
+  display: grid;
+  gap: 8px;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.corrections {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.correctionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.correctionRow > strong,
+.correctionRow > span {
+  grid-column: 1 / -1;
+}
+
+.correctionRow label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.actions {
+  margin-top: 13px;
+}
+
+@media (max-width: 720px) {
+  .totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .correctionRow {
+    grid-template-columns: 1fr;
+  }
+}

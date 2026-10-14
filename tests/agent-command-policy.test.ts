@@ -14,6 +14,8 @@ describe("agent terminal command policy", () => {
     expect(validatePlannedTerminalCommand({program: "npm", args: ["run", "test"], reason: "Run tests"}).allowed).toBe(true);
     expect(validatePlannedTerminalCommand({program: "npm", args: ["run", "build"], reason: "Verify build"}).allowed).toBe(true);
     expect(validatePlannedTerminalCommand({program: "npm", args: ["run", "agent:upgrade", "--", "--help"], reason: "Check CLI help"}).allowed).toBe(true);
+    expect(validatePlannedTerminalCommand({program: "npm", args: ["run", "test", "--", "tests/database-smoke.test.ts"], reason: "Run disposable database regressions"}).allowed).toBe(true);
+    expect(validatePlannedTerminalCommand({program: "npm", args: ["test", "--", "tests/nutrition-core.test.ts"], reason: "Run focused nutrition tests"}).allowed).toBe(true);
   });
 
   it("allows read-only diagnostics and memory, but not recursive repair or watch mode", () => {
@@ -35,5 +37,7 @@ describe("agent terminal command policy", () => {
     expect(validatePlannedTerminalCommand({program: "rg", args: ["--files", "src"], reason: "List files"}).allowed).toBe(false);
     expect(validatePlannedTerminalCommand({program: "rg", args: ["secret\nvalue", "src"], reason: "Invalid multiline search"}).allowed).toBe(false);
     expect(validatePlannedTerminalCommand({program: "npm", args: ["run", "test", "&& rm -rf /"], reason: "Inject command"}).allowed).toBe(false);
+    expect(validatePlannedTerminalCommand({program: "npm", args: ["run", "test", "--", "../private.test.ts"], reason: "Escape test root"}).allowed).toBe(false);
+    expect(validatePlannedTerminalCommand({program: "npm", args: ["run", "test", "--", "scripts/private.ts"], reason: "Run outside test root"}).allowed).toBe(false);
   });
 });

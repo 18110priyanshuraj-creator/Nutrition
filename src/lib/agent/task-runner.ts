@@ -1,10 +1,11 @@
-import {randomUUID} from "node:crypto";
+import {createHash, randomUUID} from "node:crypto";
 import {spawn, type ChildProcess} from "node:child_process";
 import {execFileSync} from "node:child_process";
-import {readFileSync} from "node:fs";
+import {lstatSync, readFileSync} from "node:fs";
 import {join} from "node:path";
 import {getDb} from "../db";
 import {redactSecrets} from "./secret-redaction";
+import {changedTaskFiles, type TaskFileSnapshot} from "./task-files";
 
 export type AgentTaskStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled" | "interrupted";
 type TaskRow = {
@@ -118,6 +119,51 @@ function git(args: string[]): string {
 }
 function currentFiles(): string[] {
   return git(["status", "--porcelain=v1", "--untracked-files=all"]).split("\n").filter(Boolean).map((line) => line.slice(3).trim().replace(/^"(.*)"$/, "$1"));
+}
+function reportableTaskPath(path: string): boolean {
+  if (!path || path.includes("\0") || path.startsWith("/") || path.includes("\\")
+    || path.split("/").some((part) => !part || part === "." || part === "..")) return false;
+  if (!/\.(?:ts|tsx|js|jsx|mjs|cjs|md|css|sql|json|ya?ml)$/i.test(path)) return false;
+  if (/(^|\/)(?:\.env(?:\..*)?|\.git|node_modules|\.next|data|coverage|dist|\.agent|uploads|photos|exports)(\/|$)/i.test(path)) return false;
+  if (/(^|\/)(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|.*\.sqlite(?:-wal|-shm)?|.*credentials.*|.*\.pem|.*\.key|.*\.p12)$/i.test(path)) return false;
+  return true;
+}
+function hasSymlinkAncestor(path: string): boolean {
+  let current = process.cwd();
+  for (const part of path.split("/")) {
+    current = join(/*turbopackIgnore: true*/ current, part);
+    try {
+      if (lstatSync(current).isSymbolicLink()) return true;
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+      throw error;
+    }
+  }
+  return false;
+}
+function currentFileSnapshot(): TaskFileSnapshot {
+  const snapshot: TaskFileSnapshot = {};
+  for (const path of currentFiles()) {
+    if (!reportableTaskPath(path)) continue;
+    if (hasSymlinkAncestor(path)) continue;
+    const absolutePath = join(/*turbopackIgnore: true*/ process.cwd(), path);
+    let info;
+    try {
+      info = lstatSync(absolutePath);
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+        snapshot[path] = null;
+        continue;
+      }
+      throw error;
+    }
+    if (info.isFile()) {
+      snapshot[path] = info.size > 5 * 1024 * 1024
+        ? `metadata:${info.size}:${info.mtimeMs}:${info.ctimeMs}`
+        : createHash("sha256").update(readFileSync(absolutePath)).digest("hex");
+    }
+  }
+  return snapshot;
 }
 function getTask(id: string): TaskDbRow | undefined {
   return getDb().prepare("SELECT * FROM agent_tasks WHERE id=?").get(id) as TaskDbRow | undefined;
@@ -302,8 +348,7 @@ async function executeTask(task: TaskDbRow): Promise<void> {
   let files: string[] = [];
   let gitFailure: string | null = null;
   try {
-    const baseline = new Set(jsonArray(task.baseline_files_json));
-    files = currentFiles().filter((file) => !baseline.has(file) && !file.startsWith(".agent/"));
+    files = changedTaskFiles(task.baseline_files_json, currentFileSnapshot()).filter((file) => !file.startsWith(".agent/"));
   } catch (error) {
     gitFailure = redactSecrets(error instanceof Error ? error.message : String(error));
   }
@@ -361,7 +406,7 @@ export function createAgentTask(request: string): AgentTask {
   const id = randomUUID();
   const branch = git(["branch", "--show-current"]);
   const commitSha = git(["rev-parse", "HEAD"]);
-  const baselineFiles = currentFiles();
+  const baselineFiles = currentFileSnapshot();
   const insert = db.transaction(() => {
     const activeCount = (db.prepare("SELECT COUNT(*) AS count FROM agent_tasks WHERE status IN ('queued','running')").get() as {count: number}).count
       + (db.prepare("SELECT worker_pid FROM agent_tasks WHERE status='interrupted' AND worker_pid IS NOT NULL").all() as Array<{worker_pid: number}>).filter((task) => agentProcessIsAlive(task.worker_pid)).length;
@@ -400,7 +445,7 @@ function createResumedTask(original: TaskDbRow): AgentTask {
       + (db.prepare("SELECT worker_pid FROM agent_tasks WHERE status='interrupted' AND worker_pid IS NOT NULL").all() as Array<{worker_pid: number}>).filter((task) => agentProcessIsAlive(task.worker_pid)).length;
     if (activeCount >= 2) throw new Error("The repository agent already has an active or queued task.");
     db.prepare("INSERT INTO agent_tasks (id,request,status,created_at,updated_at,progress,branch,commit_sha,baseline_files_json,retry_count,resume_of) VALUES(?,?,'queued',?,?,'Queued to resume from saved project memory',?,?,?,?,?)")
-      .run(id, original.request, now, now, branch, commitSha, JSON.stringify(currentFiles()), original.retry_count + 1, original.id);
+      .run(id, original.request, now, now, branch, commitSha, JSON.stringify(currentFileSnapshot()), original.retry_count + 1, original.id);
   });
   insert();
   pruneTaskHistory();
