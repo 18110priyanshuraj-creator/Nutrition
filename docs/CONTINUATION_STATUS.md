@@ -355,3 +355,9 @@ This follow-up supersedes the publication, test-count, and post-fix task-reporti
 - PR #4, [Fix meal logging portions and guarded agent reporting](https://github.com/18110priyanshuraj-creator/Nutrition/pull/4), targeted `main` and merged at `8fcc5c8747748f07855c51248440bb66898c189a` on 2026-10-14. Its `validate` CI checks, Vercel check, and preview-comments check all passed; GitHub reported the PR mergeable and clean before merge.
 - After merge, the existing `codex/nutrition-completion-20261013` branch was fast-forwarded to the merge commit and pushed normally. At this update, local `HEAD`, `origin/main`, and the remote development branch all match `8fcc5c8747748f07855c51248440bb66898c189a`; no force-push or branch deletion was used.
 - Vercel reported a successful PR preview check. This is not evidence of a permanent public production deployment; the verified live URL remains the Codespace development preview above.
+
+### Post-merge verification — 2026-10-14
+
+- Documentation-only PR #5, [Record merged completion and verification status](https://github.com/18110priyanshuraj-creator/Nutrition/pull/5), merged at `c743148e5de285cb883a87186fedda18ddd94582`. Its CI validation, Vercel, and preview-comments checks passed.
+- The push-triggered `main` CI run [38578422848](https://github.com/18110priyanshuraj-creator/Nutrition/actions/runs/38578422848) passed the agent CLI smoke test, disposable database migration smoke test, unit tests, lint, typecheck, and production build.
+- Following that merge, the existing development branch was fast-forwarded and pushed to the same `c743148e5de285cb883a87186fedda18ddd94582` main tip. This final note is a report-only commit on the same branch; no application changes remain unmerged. Public production deployment remains unverified.
