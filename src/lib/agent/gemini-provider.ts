@@ -13,6 +13,14 @@ export interface GeminiSlotStatus {
   lastSuccessAt: string | null;
   lastAttemptAt: string | null;
 }
+export interface GeminiProviderTestResult {
+  ok: boolean;
+  model: string;
+  checkedAt: string;
+  category: GeminiErrorCategory | null;
+  slot: string | null;
+  retryCount: number;
+}
 interface RuntimeState {
   consecutiveFailures: number;
   totalFailures: number;
@@ -24,6 +32,7 @@ interface RuntimeState {
 const stateByLabel = new Map<string, RuntimeState>();
 let rotationCursor = 0;
 let activeLabel: string | null = null;
+let lastProviderTest: GeminiProviderTestResult | null = null;
 
 function stateFor(label: string): RuntimeState {
   let state = stateByLabel.get(label);
@@ -53,6 +62,22 @@ export function configuredGeminiKeys(env: NodeJS.ProcessEnv = process.env): Gemi
 export function hasGeminiKey(env: NodeJS.ProcessEnv = process.env): boolean {
   return configuredGeminiKeys(env).length > 0;
 }
+export function configuredGeminiModel(env: NodeJS.ProcessEnv = process.env): string | null {
+  const model = env.GEMINI_MODEL?.trim();
+  if (!model || model.length > 200 || !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(model)) return null;
+  if (configuredGeminiKeys(env).some((slot) => slot.apiKey === model)) return null;
+  if (/^(?:AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,}|GOCSPX-[0-9A-Za-z_-]{18,})$/.test(model)) return null;
+  return model;
+}
+export function geminiRequestTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  return boundedInteger(env.GEMINI_REQUEST_TIMEOUT_MS, 60_000, 3000, 120_000);
+}
+export function recordGeminiProviderTest(result: GeminiProviderTestResult): void {
+  lastProviderTest = result;
+}
+export function getGeminiProviderTestResult(model: string | null): GeminiProviderTestResult | null {
+  return model && lastProviderTest?.model === model ? lastProviderTest : null;
+}
 function errorFacts(error: unknown): {message: string; status: number | null; code: string} {
   if (typeof error === "string") return {message: error.toLowerCase(), status: null, code: ""};
   if (!error || typeof error !== "object") return {message: String(error).toLowerCase(), status: null, code: ""};
@@ -67,18 +92,33 @@ function errorFacts(error: unknown): {message: string; status: number | null; co
     code: String(record.code ?? "").toLowerCase(),
   };
 }
+function structuredErrorText(value: unknown, seen = new WeakSet<object>(), depth = 0): string {
+  if (depth > 5 || value === null || value === undefined) return "";
+  if (typeof value === "string" || typeof value === "number") return String(value).toLowerCase();
+  if (typeof value !== "object" || seen.has(value)) return "";
+  seen.add(value);
+  if (Array.isArray(value)) return value.slice(0, 32).map((item) => structuredErrorText(item, seen, depth + 1)).join(" ");
+  const record = value as Record<string, unknown>;
+  return [
+    "message", "status", "code", "reason", "quotaMetric", "quotaId",
+    "quota_metric", "quota_id", "metadata", "details", "violations", "error", "cause",
+  ].map((key) => {
+    const text = structuredErrorText(record[key], seen, depth + 1);
+    return text ? `${key.toLowerCase()} ${text}` : "";
+  }).join(" ");
+}
 export function classifyGeminiError(error: unknown): GeminiErrorCategory {
   if (error instanceof GeminiFailoverError) return error.category;
   const facts = errorFacts(error);
-  const message = facts.message + " " + facts.code;
-  if (facts.status === 402 || /payment_required|prepay credit.{0,40}(depleted|empty)|billing.{0,30}(limit|quota|depleted)|project-wide quota|quota.{0,30}project|project.{0,30}quota/.test(message)) {
+  const message = `${facts.message} ${facts.code} ${structuredErrorText(error)}`;
+  if (facts.status === 402 || /payment_required|prepay credit.{0,40}(depleted|empty)|billing.{0,30}(limit|quota|depleted)|project-wide quota|quota.{0,120}project|project.{0,120}quota|per[_ -]?project.{0,100}quota|quota.{0,100}per[_ -]?project|exceeded.{0,30}current quota.{0,60}(billing|plan)|current quota.{0,60}(billing|plan)/.test(message)) {
     return "project_quota";
   }
   if (facts.status === 401 || /invalid[_ -]?api[_ -]?key|api[_ -]?key.{0,20}(invalid|not valid)|key.{0,15}(revoked|invalid)|unauthenticated|status.?401|\b401\b/.test(message)) {
     return "invalid_key";
   }
   if (facts.status === 403 || /permission denied|permission_denied|forbidden|access denied/.test(message)) return "permission";
-  if (facts.status === 404 || /model.{0,20}(not found|does not exist|unavailable)|not_found.*model/.test(message)) return "model_not_found";
+  if (facts.status === 404 || /model.{0,40}(not found|does not exist|unavailable|invalid|unsupported|name format)|not_found.*model/.test(message)) return "model_not_found";
   if (facts.status === 400 || /invalid_argument|invalid request|bad request|unsupported parameter/.test(message)) return "invalid_request";
   if (facts.status === 429 || /rate.?limit|rate_limit_exceeded|quota_exceeded|resource_exhausted|quota exceeded|too many requests|\b429\b/.test(message)) return "rate_limit";
   if (facts.status === 408 || facts.status === 504 || /timed? ?out|timeout|deadline exceeded|aborterror|aborted/.test(message)) return "timeout";
@@ -102,6 +142,7 @@ export interface FailoverOptions {
   maxAttempts?: number;
   cooldownMs?: number;
   now?: () => number;
+  sleep?: (milliseconds: number) => Promise<void>;
 }
 /** Retries a single operation through distinct available keys; never returns or logs key values. */
 export async function withGeminiKeyFailover<T>(
@@ -113,12 +154,16 @@ export async function withGeminiKeyFailover<T>(
     throw new GeminiFailoverError("No Gemini API key is configured. Set GEMINI_API_KEY_1 through GEMINI_API_KEY_7.", "missing_key");
   }
   const now = options.now ?? Date.now;
+  const sleep = options.sleep ?? ((milliseconds) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
   const cooldownMs = Math.max(1000, Math.min(15 * 60_000, options.cooldownMs ?? boundedInteger(
     process.env.GEMINI_KEY_COOLDOWN_MS, 60_000, 1000, 15 * 60_000,
   )));
-  const retries = boundedInteger(process.env.GEMINI_MAX_RETRIES, 6, 0, 6);
+  const retries = boundedInteger(process.env.GEMINI_MAX_RETRIES, 3, 0, 6);
   const maxAttempts = Math.max(1, Math.min(keys.length, options.maxAttempts ?? retries + 1));
-  const start = rotationCursor % keys.length;
+  const activeIndex = activeLabel === null ? -1 : keys.findIndex((slot) => slot.label === activeLabel);
+  const start = activeIndex >= 0 && stateFor(keys[activeIndex].label).cooldownUntil <= now()
+    ? activeIndex
+    : rotationCursor % keys.length;
   const rotated = [...keys.slice(start), ...keys.slice(0, start)];
   const available = rotated.filter((slot) => stateFor(slot.label).cooldownUntil <= now());
   if (available.length === 0) {
@@ -140,7 +185,7 @@ export async function withGeminiKeyFailover<T>(
       state.lastErrorCategory = null;
       state.lastSuccessAt = new Date(now()).toISOString();
       activeLabel = slot.label;
-      rotationCursor = (keys.findIndex((candidate) => candidate.label === slot.label) + 1) % keys.length;
+      rotationCursor = keys.findIndex((candidate) => candidate.label === slot.label);
       return value;
     } catch (error) {
       const category = classifyGeminiError(error);
@@ -163,6 +208,12 @@ export async function withGeminiKeyFailover<T>(
           : Math.min(15 * 60_000, cooldownMs * 2);
       state.cooldownUntil = now() + slotCooldown;
       lastRetryAfter = slotCooldown;
+      if (
+        attemptedSlots.length < candidates.length
+        && (category === "rate_limit" || category === "timeout" || category === "network")
+      ) {
+        await sleep(Math.min(2000, 250 * 2 ** (attemptedSlots.length - 1)));
+      }
     }
   }
   throw new GeminiFailoverError(
@@ -184,7 +235,7 @@ export function getGeminiProviderStatus(env: NodeJS.ProcessEnv = process.env): {
   return {
     provider: "Google Gemini",
     configured: configured.length > 0,
-    modelConfigured: Boolean(env.GEMINI_MODEL?.trim()),
+    modelConfigured: Boolean(configuredGeminiModel(env)),
     activeSlot: activeLabel,
     slots: statusLabels.map((label) => {
       const state = stateFor(label);
@@ -205,4 +256,5 @@ export function resetGeminiProviderStateForTests(): void {
   stateByLabel.clear();
   rotationCursor = 0;
   activeLabel = null;
+  lastProviderTest = null;
 }

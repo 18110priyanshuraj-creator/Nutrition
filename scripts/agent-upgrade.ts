@@ -7,7 +7,7 @@ import {createHash} from "node:crypto";
 import {existsSync, lstatSync, readFileSync} from "node:fs";
 import {mkdir, readFile, rm, writeFile} from "node:fs/promises";
 import {dirname, isAbsolute, join, relative, resolve, sep} from "node:path";
-import {configuredGeminiKeys, withGeminiKeyFailover} from "../src/lib/agent/gemini-provider";
+import {classifyGeminiError, configuredGeminiKeys, configuredGeminiModel, geminiRequestTimeoutMs, withGeminiKeyFailover} from "../src/lib/agent/gemini-provider";
 import {redactSecrets as redact} from "../src/lib/agent/secret-redaction";
 import {validatePlannedTerminalCommand, type PlannedTerminalCommand} from "../src/lib/agent/command-policy";
 import {isAtLeastAsGood} from "../src/lib/agent/checkpoint-policy";
@@ -252,8 +252,8 @@ async function propose(
   history: string[],
   terminalResults = "",
 ): Promise<Proposal> {
-  const model = process.env.GEMINI_MODEL?.trim();
-  if (!model) throw new Error("GEMINI_MODEL is not configured in the private environment.");
+  const model = configuredGeminiModel();
+  if (!model) throw new Error("GEMINI_MODEL must be a valid API model ID in the private environment.");
   if (configuredGeminiKeys().length === 0) throw new Error("No Gemini key slot is configured. Set keys in the private environment; never paste keys into chat.");
   const prompt = [
     "You are the senior engineer operating an existing private personal Nutrition Tracker repository. Make real, narrow, high-value code improvements, not advice.",
@@ -276,7 +276,7 @@ async function propose(
   ].join("\n\n");
   const response = await withGeminiKeyFailover(async (apiKey) => {
     const ai = new GoogleGenAI({apiKey, httpOptions: {
-      timeout: integer("GEMINI_REQUEST_TIMEOUT_MS", 60000, 3000, 120000),
+      timeout: geminiRequestTimeoutMs(),
       retryOptions: {attempts: 1},
     }});
     return ai.models.generateContent({
@@ -465,24 +465,29 @@ async function writeReport(root: string, report: Record<string, unknown>): Promi
   await writeFile(path, JSON.stringify(report, null, 2) + "\n", {encoding: "utf8", mode: 0o600});
 }
 async function runGeminiPreflight(): Promise<void> {
-  const model = process.env.GEMINI_MODEL?.trim();
+  const model = configuredGeminiModel();
   const keys = configuredGeminiKeys();
-  if (!model) throw new Error("GEMINI_MODEL is missing. Set it in the private Codespace environment.");
+  if (!model) throw new Error("GEMINI_MODEL must be a valid API model ID in the private Codespace environment.");
   if (keys.length === 0) throw new Error("No Gemini key slot is configured. Set GEMINI_API_KEY_1 through GEMINI_API_KEY_7 in private Codespace Secrets.");
   console.log("Testing Google Gemini connectivity and model access.");
   console.log("Configured model: " + redact(model));
   console.log("Configured key slots: " + keys.length + " (values hidden)");
-  const response = await withGeminiKeyFailover(async (apiKey) => {
-    const ai = new GoogleGenAI({apiKey, httpOptions: {
-      timeout: integer("GEMINI_REQUEST_TIMEOUT_MS", 60000, 3000, 120000),
-      retryOptions: {attempts: 1},
-    }});
-    return ai.models.generateContent({
-      model,
-      contents: "Reply with OK only.",
-      config: {temperature: 0, maxOutputTokens: 8},
+  let response: {text?: string};
+  try {
+    response = await withGeminiKeyFailover(async (apiKey) => {
+      const ai = new GoogleGenAI({apiKey, httpOptions: {
+        timeout: geminiRequestTimeoutMs(),
+        retryOptions: {attempts: 1},
+      }});
+      return ai.models.generateContent({
+        model,
+        contents: "Reply with OK only.",
+        config: {temperature: 0, maxOutputTokens: 8},
+      });
     });
-  });
+  } catch (error) {
+    throw new Error("Gemini preflight failed (" + classifyGeminiError(error) + "). Provider details and credentials are hidden.");
+  }
   if (!response.text?.trim()) throw new Error("Gemini connectivity worked, but the model returned no text.");
   console.log("GEMINI PREFLIGHT: PASS");
   console.log("Response: " + redact(response.text.trim()).slice(0, 80));
@@ -529,9 +534,10 @@ async function main(): Promise<void> {
   console.log("Protected pre-existing modified/untracked paths: " + statusAtStart.size);
   console.log("Eligible clean tracked source files: " + initialContents.size);
   console.log("Gemini key slots configured: " + configuredGeminiKeys().length);
-  console.log("Model: " + (process.env.GEMINI_MODEL?.trim() || "(not configured)"));
-  if (!process.env.GEMINI_MODEL?.trim() || configuredGeminiKeys().length === 0) {
-    throw new Error("Configure GEMINI_MODEL and Gemini keys in .env before starting this command.");
+  const model = configuredGeminiModel();
+  console.log("Model ID: " + (model || "(missing or invalid)"));
+  if (!model || configuredGeminiKeys().length === 0) {
+    throw new Error("Configure a valid GEMINI_MODEL ID and Gemini keys in the private environment before starting this command.");
   }
   const baseline = checkSet(root);
   console.log("\nBaseline: " + checkSummary(baseline));

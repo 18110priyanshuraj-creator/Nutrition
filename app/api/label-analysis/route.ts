@@ -1,5 +1,5 @@
 import {GoogleGenAI} from "@google/genai";
-import {classifyGeminiError, hasGeminiKey, withGeminiKeyFailover} from "@/lib/agent/gemini-provider";
+import {classifyGeminiError, configuredGeminiModel, geminiRequestTimeoutMs, hasGeminiKey, withGeminiKeyFailover} from "@/lib/agent/gemini-provider";
 import {NextRequest,NextResponse} from "next/server";
 import {z} from "zod";
 import {requireOwner} from "@/lib/server-auth";
@@ -48,13 +48,12 @@ export async function POST(request:NextRequest){
  if(file.size>maxMb*1024*1024)return NextResponse.json({error:"Image exceeds the configured "+maxMb+" MB limit."},{status:413});
  const bytes=new Uint8Array(await file.arrayBuffer());const mimeType=imageMime(bytes);
  if(!mimeType)return NextResponse.json({error:"Image contents were invalid. Use a real JPEG, PNG, or WebP file."},{status:415});
- const model=process.env.GEMINI_MODEL?.trim();
+ const model=configuredGeminiModel();
  if(!hasGeminiKey()||!model)return NextResponse.json({error:"Package-label extraction requires GEMINI_MODEL and at least one server-side Gemini key slot (GEMINI_API_KEY_1 through GEMINI_API_KEY_7). Nothing was saved."},{status:503});
  const prompt="Read the visible nutrition facts label in the provided image. Do not guess unreadable values. Return product name if visible, serving-size text, servingGrams only when the label states or clearly establishes a weight in grams (do not equate millilitres to grams without evidence), basis per_100g or per_serving, and only nutrient values visibly present. Map labels to one of these canonical keys only when the identity and reporting convention are clear: "+keyList.join(", ")+". Otherwise use key other or null. Source units must match the label. For vitamin A, state uncertainty about retinol/RAE form if not specified; for folate and niacin mention convention uncertainty. Never calculate nutrition for foods based on the photograph. Provide short issues for unreadable/cropped/ambiguous parts. Confidence is about reading clarity, not scientific verification.";
- const timeoutRaw=Number(process.env.GEMINI_REQUEST_TIMEOUT_MS??60000),timeout=Number.isFinite(timeoutRaw)?Math.max(3000,Math.min(120000,timeoutRaw)):60000;
  try{
   const response=await withGeminiKeyFailover(async(apiKey)=>{
-   const ai=new GoogleGenAI({apiKey,httpOptions:{timeout,retryOptions:{attempts:1}}});
+   const ai=new GoogleGenAI({apiKey,httpOptions:{timeout:geminiRequestTimeoutMs(),retryOptions:{attempts:1}}});
    return ai.models.generateContent({model,contents:[{text:prompt},{inlineData:{mimeType,data:Buffer.from(bytes).toString("base64")}}],config:{temperature:0,maxOutputTokens:2400,responseMimeType:"application/json",responseJsonSchema:jsonSchema as never}});
   });
   if(!response.text)return NextResponse.json({error:"Gemini returned no label text. Nothing was saved."},{status:502});

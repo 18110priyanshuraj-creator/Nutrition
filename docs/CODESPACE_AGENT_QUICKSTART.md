@@ -28,7 +28,7 @@ git status --short
 
 ## 2. Configure Gemini privately
 
-Set GEMINI_MODEL=gemini-3.5-flash-lite and at least one of GEMINI_API_KEY_1 through GEMINI_API_KEY_7 in the Codespace's private environment/secrets, or in the ignored local .env. Additional unique keys allow slot failover. The legacy GEMINI_API_KEY remains supported.
+Set GEMINI_MODEL to an API model ID available to your Google AI project (not its display name) and at least one of GEMINI_API_KEY_1 through GEMINI_API_KEY_7 in Codespaces Secrets or ignored `.env.local`. Additional keys allow bounded slot failover. The legacy GEMINI_API_KEY remains supported only when numbered slots are absent. The default is three extra attempts; set GEMINI_MAX_RETRIES=6 to allow all seven slots. Restart the application after changing environment values.
 
 Never commit .env, paste a key into chat, or put a key in the task prompt.
 
@@ -70,6 +70,16 @@ npm run build
 ```
 
 Reports and verified lessons are written locally under ignored .agent/upgrade-report.json and .agent/memory.json. Inspect the patch before committing anything.
+
+## In-app N widget
+
+The authenticated app's bottom-right **N** button opens the repository task runner. The Next.js API in this Codespace invokes the existing `scripts/agent.ts` Gemini coding agent in the same repository process environment; it does not connect to the VS Code Copilot chat/session or expose a terminal port. The nutrition assistant remains separate and unchanged.
+
+The service is enabled only when `CODESPACES=true` or `MYNUTRI_ENABLE_AGENT=true`. Do not enable it on a publicly hosted application. Both task endpoints require the owner session and same-origin POSTs. Credential-bearing task requests are rejected, captured output is redacted, and provider keys are never returned to the browser. Task state, check results, branch/commit, bounded logs and changed-file paths are stored in the existing SQLite database by migration `0005_agent_tasks.sql`.
+
+Execution is intentionally limited: one task runs at a time with at most one queued task, the worker stops after one hour, and at most two explicit resume attempts are accepted. The existing CLI runs only its fixed lint/typecheck/test/build checks, does not execute model-supplied shell commands, and may edit at most four **clean, tracked** TypeScript files. Authentication, data deletion/restore, provider settings, task-service, database, migration, environment and agent-core paths are protected. Existing dirty files are never patched. No commit, push, deploy, database migration command or production operation is run by a task. Agent builds use `.next-agent-check` so they do not overwrite a running app's `.next` output.
+
+The widget displays configured provider state honestly: configured keys do not imply a live healthy provider. A failed Gemini request remains a task failure with sanitized logs; no mock response is substituted. After an app-worker restart, a running task is marked interrupted; inspect its branch/diff and choose **Resume** explicitly after the old process exits. Resume re-submits the saved request through the guarded CLI and its saved project memory; it is not a byte-for-byte continuation of a running model response.
 
 ## Branch cleanup
 

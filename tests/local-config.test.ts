@@ -43,6 +43,8 @@ describe("local secrets configuration helpers", () => {
     const root = mkdtempSync(join(tmpdir(), "mynutri-env-"));
     writeFileSync(join(root, ".env"), "GEMINI_MODEL=base-model\nGEMINI_API_KEY_1=base-key\n");
     writeFileSync(join(root, ".env.local"), "GEMINI_MODEL=local-model\nGEMINI_API_KEY_1=local-key\nGEMINI_API_KEY_2=local-key-2\n");
+    for (let index = 1; index <= 7; index += 1) delete process.env[`GEMINI_API_KEY_${index}`];
+    delete process.env.GEMINI_API_KEY;
     process.env.GEMINI_MODEL = "runtime-model";
     process.env.GEMINI_API_KEY_1 = "runtime-key";
     const priorCwd = process.cwd();

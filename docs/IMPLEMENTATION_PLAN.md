@@ -1,10 +1,26 @@
 # MyNutri AI — Implementation Plan
 
-Branch: `codex/mynutri-ai-foundation`  
+Branch: `codex/nutrition-completion-20261013`
 Repository: https://github.com/priyasnshu/Nutrition  
-Last updated: 2026-10-12
+Last updated: 2026-10-14
+
+The latest verification state and the durable requirement checklist are in [`CONTINUATION_STATUS.md`](./CONTINUATION_STATUS.md). In particular, local lint/typecheck/tests/build and authenticated production API smoke checks passed; live Gemini `generateContent` remains blocked by a network timeout despite successful model listing.
 
 Use the companion `docs/CONTINUATION_STATUS.md` as the audit snapshot. A checked box means the source change or audit task is complete; it does **not** imply runtime verification unless the status record names a real successful command or CI result.
+
+## Gemini and photo-analysis repair — 2026-10-13
+
+- [x] Inspect the current branch/worktree and preserve the pre-existing `AGENTS.md` edit.
+- [x] Reproduce the provider failure with a minimal live request and inspect only sanitized API error details.
+- [x] Confirm the root cause: `.env.local` contained the model display name, which Gemini rejected with HTTP 400 `INVALID_ARGUMENT` (`unexpected model name format`); correct only that ignored local setting to an API model ID returned by the configured project's model list.
+- [x] Use one provider/keyring for app workflows and coding-agent requests; prefer the last healthy slot, preserve numbered-slot order, retain the legacy fallback, bound retries to three extra attempts by default, and centralize timeout behavior.
+- [x] Make provider status distinguish unconfigured, invalid model, untested, healthy, and failed states without exposing raw provider details or credentials; make refresh a no-cost status read.
+- [x] Add deterministic tests for key/model configuration, failover, cooldown, retry limits, status health, image bytes/schema proposal handling, and unsupported images.
+- [x] Complete an earlier live minimal Gemini provider test and verify an authenticated dashboard and Settings provider-test request against an isolated SQLite database.
+- [ ] Reconfirm live Gemini health after the final provider changes; the final single preflight timed out, while the earlier request succeeded.
+- [ ] Capture a caller-visible synthetic food-image proposal response; the dev server logged HTTP 200, but the client timed out waiting for the slow model response.
+- [ ] Complete browser automation and an actual user food-photo verification; do not infer visual-recognition quality from the synthetic image.
+- [x] Run `npm run agent:doctor` and an isolated `npm run db:migrate`; record exact results in `docs/CONTINUATION_STATUS.md`.
 
 ## P0 — Recover the actual Codespace state safely
 

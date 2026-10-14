@@ -1,5 +1,6 @@
 node_modules/
 .next/
+.next-agent-check/
 out/
 dist/
 coverage/

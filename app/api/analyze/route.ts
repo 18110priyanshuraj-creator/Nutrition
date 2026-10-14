@@ -1,6 +1,6 @@
 import {requireOwner} from "@/lib/server-auth";
 import {GoogleGenAI} from "@google/genai";
-import {classifyGeminiError, hasGeminiKey, withGeminiKeyFailover} from "@/lib/agent/gemini-provider";
+import {classifyGeminiError, configuredGeminiModel, geminiRequestTimeoutMs, hasGeminiKey, withGeminiKeyFailover} from "@/lib/agent/gemini-provider";
 import {NextRequest,NextResponse} from "next/server";
 import {z} from "zod";
 import {foodList} from "@/lib/server-data";
@@ -63,7 +63,7 @@ export async function POST(request:NextRequest){
   text=body.data.text;
  }
  const catalog=foodList() as unknown as Array<{id:string;name:string;aliases:string[];nutrients:Record<string,number>}>;
- const model=process.env.GEMINI_MODEL;
+ const model=configuredGeminiModel();
  if(!hasGeminiKey()||!model){
   if(imageData)return NextResponse.json({error:"Photo recognition needs GEMINI_MODEL and at least one server-side key slot (GEMINI_API_KEY_1 through GEMINI_API_KEY_7). Manual food selection still works; the photo was not saved."},{status:503});
   const matched=parseKnownFoods(text,catalog);
@@ -75,7 +75,7 @@ export async function POST(request:NextRequest){
  try{
   const contents=imageData?[prompt,{inlineData:{mimeType:imageData.mimeType,data:imageData.data}}]:prompt;
   const response=await withGeminiKeyFailover(async(apiKey)=>{
-   const ai=new GoogleGenAI({apiKey,httpOptions:{timeout:Math.max(3000,Math.min(60000,Number(process.env.GEMINI_REQUEST_TIMEOUT_MS||20000))),retryOptions:{attempts:1}}});
+   const ai=new GoogleGenAI({apiKey,httpOptions:{timeout:geminiRequestTimeoutMs(),retryOptions:{attempts:1}}});
    return ai.models.generateContent({model,contents,config:{temperature:0.1,maxOutputTokens:1800,responseMimeType:"application/json",responseJsonSchema:responseJsonSchema as never}});
   });
   resultText=response.text||"";

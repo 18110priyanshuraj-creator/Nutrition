@@ -6,6 +6,7 @@ import {fileURLToPath} from "node:url";
 import {spawnSync} from "node:child_process";
 import {emitKeypressEvents, createInterface} from "node:readline";
 import {config as loadDotenv, parse} from "dotenv";
+import {configuredGeminiModel} from "../src/lib/agent/gemini-provider";
 
 const slotNames = Array.from({length: 7}, (_, index) => `GEMINI_API_KEY_${index + 1}`);
 const placeholderPassword = "replace-with-a-long-unique-password-at-least-12-characters";
@@ -107,7 +108,8 @@ function showStatus(local: Record<string, string>, base: Record<string, string>,
     console.log(`${key}: ${effective[key]?.trim() ? "configured" : "empty"}`);
   }
   console.log(`GEMINI_API_KEY legacy fallback: ${effective.GEMINI_API_KEY?.trim() ? "configured" : "empty"}`);
-  console.log(`GEMINI_MODEL: ${effective.GEMINI_MODEL?.trim() ? "configured (model name is not validated)" : "not set"}`);
+  const modelId = configuredGeminiModel(effective as NodeJS.ProcessEnv);
+  console.log(`GEMINI_MODEL: ${modelId ? "configured (model ID format accepted; availability not tested)" : effective.GEMINI_MODEL?.trim() ? "invalid model ID format" : "not set"}`);
 }
 
 function askLine(question: string): Promise<string> {
@@ -252,7 +254,7 @@ async function main(): Promise<void> {
   }
   const legacy = await secretUpdate("GEMINI_API_KEY", effective.GEMINI_API_KEY);
   if (legacy !== undefined) updates.set("GEMINI_API_KEY", legacy);
-  const model = await askLine(`GEMINI_MODEL (${effective.GEMINI_MODEL?.trim() ? "configured" : "not set"}; Enter keeps it, - clears local value): `);
+  const model = await askLine(`GEMINI_MODEL (${configuredGeminiModel(effective as NodeJS.ProcessEnv) ? "valid model ID" : effective.GEMINI_MODEL?.trim() ? "invalid model ID" : "not set"}; Enter keeps it, - clears local value): `);
   if (model === "-") updates.set("GEMINI_MODEL", null);
   else if (model.trim()) updates.set("GEMINI_MODEL", model.trim());
 

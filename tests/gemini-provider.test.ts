@@ -2,6 +2,8 @@ import {afterEach, describe, expect, it} from "vitest";
 import {
   classifyGeminiError,
   configuredGeminiKeys,
+  configuredGeminiModel,
+  geminiRequestTimeoutMs,
   getGeminiProviderStatus,
   resetGeminiProviderStateForTests,
   withGeminiKeyFailover,
@@ -62,6 +64,28 @@ describe("Gemini key configuration", () => {
   it("keeps legacy key configuration working when numbered slots are absent", () => {
     expect(configuredGeminiKeys({GEMINI_API_KEY: "legacy-secret"} as unknown as NodeJS.ProcessEnv)).toEqual([{label: "Legacy fallback", apiKey: "legacy-secret"}]);
   });
+  it("accepts API model identifiers but rejects display names and configured keys", () => {
+    expect(configuredGeminiModel({GEMINI_MODEL: "gemini-3.5-flash-lite"} as unknown as NodeJS.ProcessEnv)).toBe("gemini-3.5-flash-lite");
+    expect(configuredGeminiModel({GEMINI_MODEL: "models/gemini-3.5-flash-lite"} as unknown as NodeJS.ProcessEnv)).toBe("models/gemini-3.5-flash-lite");
+    expect(configuredGeminiModel({GEMINI_MODEL: "Gemini 3.5 Flash-Lite"} as unknown as NodeJS.ProcessEnv)).toBeNull();
+    expect(configuredGeminiModel({GEMINI_MODEL: "private-key-value", GEMINI_API_KEY_1: "private-key-value"} as unknown as NodeJS.ProcessEnv)).toBeNull();
+  });
+  it("uses a bounded 60-second request timeout", () => {
+    const original = process.env.GEMINI_REQUEST_TIMEOUT_MS;
+    try {
+      delete process.env.GEMINI_REQUEST_TIMEOUT_MS;
+      expect(geminiRequestTimeoutMs()).toBe(60_000);
+      process.env.GEMINI_REQUEST_TIMEOUT_MS = "2500";
+      expect(geminiRequestTimeoutMs()).toBe(3000);
+      process.env.GEMINI_REQUEST_TIMEOUT_MS = "180000";
+      expect(geminiRequestTimeoutMs()).toBe(120_000);
+      process.env.GEMINI_REQUEST_TIMEOUT_MS = "invalid";
+      expect(geminiRequestTimeoutMs()).toBe(60_000);
+    } finally {
+      if (original === undefined) delete process.env.GEMINI_REQUEST_TIMEOUT_MS;
+      else process.env.GEMINI_REQUEST_TIMEOUT_MS = original;
+    }
+  });
 });
 describe("Gemini failure classification", () => {
   it("distinguishes timeout, key, model and project quota errors", () => {
@@ -70,8 +94,21 @@ describe("Gemini failure classification", () => {
     expect(classifyGeminiError({status: 401, message: "API key invalid"})).toBe("invalid_key");
     expect(classifyGeminiError({status: 400, message: "API_KEY_INVALID"})).toBe("invalid_key");
     expect(classifyGeminiError({status: 402, message: "payment required"})).toBe("project_quota");
+    expect(classifyGeminiError({status: 429, message: "You exceeded your current quota, please check your plan and billing details."})).toBe("project_quota");
+    expect(classifyGeminiError({
+      status: 429,
+      message: "Quota exceeded.",
+      details: [{
+        "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+        violations: [{
+          quotaMetric: "generativelanguage.googleapis.com/generate_content_free_tier_requests",
+          quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+        }],
+      }],
+    })).toBe("project_quota");
     expect(classifyGeminiError({status: 503, message: "service unavailable"})).toBe("network");
     expect(classifyGeminiError({status: 404, message: "model not found"})).toBe("model_not_found");
+    expect(classifyGeminiError({status: 400, message: "GenerateContentRequest.model: unexpected model name format"})).toBe("model_not_found");
     expect(classifyGeminiError(new Error("project-wide quota exceeded"))).toBe("project_quota");
     expect(classifyGeminiError(new Error("HTTP 401 unauthorized"))).toBe("invalid_key");
     expect(classifyGeminiError(new Error("HTTP 429 rate limited"))).toBe("rate_limit");
@@ -88,19 +125,66 @@ describe("Gemini key failover", () => {
   ];
   it("moves to a second slot after a timeout", async () => {
     const tried: string[] = [];
+    const delays: number[] = [];
     const result = await withGeminiKeyFailover(async (apiKey) => {
       tried.push(apiKey);
       if (apiKey === "private-one") throw new Error("timeout");
       return "ok";
-    }, {keys, cooldownMs: 1000, now: () => 1_800_000_000_000, maxAttempts: 4});
+    }, {
+      keys,
+      cooldownMs: 1000,
+      now: () => 1_800_000_000_000,
+      maxAttempts: 4,
+      sleep: async (milliseconds) => { delays.push(milliseconds); },
+    });
     expect(result).toBe("ok");
     expect(tried).toEqual(["private-one", "private-two"]);
+    expect(delays).toEqual([250]);
     const status = getGeminiProviderStatus({
       GEMINI_API_KEY_1: "private-one", GEMINI_API_KEY_2: "private-two",
       GEMINI_API_KEY_3: "private-three", GEMINI_API_KEY_4: "private-four", GEMINI_MODEL: "test-model",
     } as unknown as NodeJS.ProcessEnv);
     expect(status.activeSlot).toBe("Slot 2");
     expect(JSON.stringify(status)).not.toContain("private-one");
+  });
+  it("fails over after a key-specific rate limit and applies cooldown to that slot", async () => {
+    const tried: string[] = [];
+    const result = await withGeminiKeyFailover(async (_key, slot) => {
+      tried.push(slot);
+      if (slot === "Slot 1") throw {status: 429, message: "rate limit exceeded for this API key"};
+      return "ok";
+    }, {keys, cooldownMs: 1000, now: () => 1_800_000_000_000});
+
+    expect(result).toBe("ok");
+    expect(tried).toEqual(["Slot 1", "Slot 2"]);
+    const status = getGeminiProviderStatus({
+      GEMINI_API_KEY_1: "private-one", GEMINI_API_KEY_2: "private-two",
+      GEMINI_API_KEY_3: "private-three", GEMINI_API_KEY_4: "private-four",
+    } as unknown as NodeJS.ProcessEnv);
+    expect(status.slots[0].lastErrorCategory).toBe("rate_limit");
+  });
+  it("fails over after an invalid credential without exposing it", async () => {
+    const tried: string[] = [];
+    const result = await withGeminiKeyFailover(async (apiKey, slot) => {
+      tried.push(slot);
+      if (slot === "Slot 1") throw {status: 401, message: `invalid API key ${apiKey}`};
+      return "ok";
+    }, {keys, cooldownMs: 1000, now: () => 1_800_000_000_000});
+
+    expect(result).toBe("ok");
+    expect(tried).toEqual(["Slot 1", "Slot 2"]);
+  });
+  it("keeps using the last healthy slot instead of rotating on every request", async () => {
+    const tried: string[] = [];
+    const run = () => withGeminiKeyFailover(async (_key, slot) => {
+      tried.push(slot);
+      return "ok";
+    }, {keys, cooldownMs: 1000, now: () => 1_800_000_000_000});
+
+    await run();
+    await run();
+
+    expect(tried).toEqual(["Slot 1", "Slot 1"]);
   });
   it("can try all seven configured slots when six retries are allowed", async () => {
     const priorRetries = process.env.GEMINI_MAX_RETRIES;
@@ -116,12 +200,42 @@ describe("Gemini key failover", () => {
       await expect(withGeminiKeyFailover(async (_key, slot) => {
         tried.push(slot);
         throw new Error("timeout");
-      }, {keys: sevenKeys, cooldownMs: 1000, now: () => 1_800_000_000_000})).rejects.toMatchObject({category: "timeout"});
+      }, {keys: sevenKeys, cooldownMs: 1000, now: () => 1_800_000_000_000, sleep: async () => {}})).rejects.toMatchObject({category: "timeout"});
       expect(tried).toEqual(["Slot 1", "Slot 2", "Slot 3", "Slot 4", "Slot 5", "Slot 6", "Slot 7"]);
     } finally {
       if (priorRetries === undefined) delete process.env.GEMINI_MAX_RETRIES;
       else process.env.GEMINI_MAX_RETRIES = priorRetries;
     }
+  });
+  it("uses three extra attempts by default", async () => {
+    const priorRetries = process.env.GEMINI_MAX_RETRIES;
+    delete process.env.GEMINI_MAX_RETRIES;
+    const sevenKeys = Array.from({length: 7}, (_, index) => ({label: `Slot ${index + 1}`, apiKey: `private-${index + 1}`}));
+    const tried: string[] = [];
+    try {
+      await expect(withGeminiKeyFailover(async (_key, slot) => {
+        tried.push(slot);
+        throw new Error("request timed out");
+      }, {keys: sevenKeys, cooldownMs: 1000, now: () => 1_800_000_000_000, sleep: async () => {}})).rejects.toMatchObject({category: "timeout"});
+      expect(tried).toEqual(["Slot 1", "Slot 2", "Slot 3", "Slot 4"]);
+    } finally {
+      if (priorRetries === undefined) delete process.env.GEMINI_MAX_RETRIES;
+      else process.env.GEMINI_MAX_RETRIES = priorRetries;
+    }
+  });
+  it("uses bounded exponential backoff between transient failures", async () => {
+    const delays: number[] = [];
+    await expect(withGeminiKeyFailover(async () => {
+      throw {status: 503, message: "temporary network failure"};
+    }, {
+      keys,
+      maxAttempts: 4,
+      cooldownMs: 1000,
+      now: () => 1_800_000_000_000,
+      sleep: async (milliseconds) => { delays.push(milliseconds); },
+    })).rejects.toMatchObject({category: "network"});
+
+    expect(delays).toEqual([250, 500, 1000]);
   });
   it("stops on a missing model instead of rotating all keys", async () => {
     const tried: string[] = [];
@@ -136,6 +250,29 @@ describe("Gemini key failover", () => {
     await expect(withGeminiKeyFailover(async (_key, slot) => {
       tried.push(slot);
       throw new Error("project-wide quota exceeded");
+    }, {keys, cooldownMs: 1000, now: () => 1_800_000_000_000})).rejects.toMatchObject({category: "project_quota"});
+    expect(tried).toEqual(["Slot 1"]);
+  });
+  it("does not rotate keys for a quota that requires a billing or plan change", async () => {
+    const tried: string[] = [];
+    await expect(withGeminiKeyFailover(async (_key, slot) => {
+      tried.push(slot);
+      throw {status: 429, message: "You exceeded your current quota, please check your plan and billing details."};
+    }, {keys, cooldownMs: 1000, now: () => 1_800_000_000_000})).rejects.toMatchObject({category: "project_quota"});
+    expect(tried).toEqual(["Slot 1"]);
+  });
+  it("does not rotate keys for structured per-project quota violations", async () => {
+    const tried: string[] = [];
+    await expect(withGeminiKeyFailover(async (_key, slot) => {
+      tried.push(slot);
+      throw {
+        status: 429,
+        message: "Quota exceeded.",
+        details: [{
+          "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+          violations: [{quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}],
+        }],
+      };
     }, {keys, cooldownMs: 1000, now: () => 1_800_000_000_000})).rejects.toMatchObject({category: "project_quota"});
     expect(tried).toEqual(["Slot 1"]);
   });

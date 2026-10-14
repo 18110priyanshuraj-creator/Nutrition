@@ -7,9 +7,13 @@ export const runtime="nodejs";
 export async function GET(request:NextRequest){
  const unauthorized=await requireOwner(request);if(unauthorized)return unauthorized;
  const from=request.nextUrl.searchParams.get("from");const to=request.nextUrl.searchParams.get("to");
+ if(from!==null||to!==null){
+  if(!from||!to||!isDate(from)||!isDate(to)||from>to)
+   return NextResponse.json({error:"Provide a valid measurement date range with from on or before to."},{status:400});
+ }
  const db=getDb();
  let rows:Record<string,unknown>[];
- if(from&&to&&isDate(from)&&isDate(to))rows=db.prepare("SELECT * FROM measurements WHERE local_date BETWEEN ? AND ? ORDER BY recorded_at DESC LIMIT 500").all(from,to) as Record<string,unknown>[];
+ if(from&&to)rows=db.prepare("SELECT * FROM measurements WHERE local_date BETWEEN ? AND ? ORDER BY recorded_at DESC LIMIT 500").all(from,to) as Record<string,unknown>[];
  else rows=db.prepare("SELECT * FROM measurements ORDER BY recorded_at DESC LIMIT 200").all() as Record<string,unknown>[];
  return NextResponse.json({measurements:rows});
 }

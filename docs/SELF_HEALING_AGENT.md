@@ -33,9 +33,9 @@ Configure private server-side environment variables:
 - `GEMINI_API_KEY_7`
 - `GEMINI_MODEL`
 
-The previous `GEMINI_API_KEY` variable remains a fallback when no numbered slot is set. Never commit secret values or expose them in logs. Slot status reports only configured/empty state and sanitized runtime counters, never key values. The example model name is not proof of model availability. The optional preflight performs a real provider request and must only be run when you choose to spend API quota.
+The previous `GEMINI_API_KEY` variable remains a fallback when no numbered slot is set. Numbered slots are discovered from 1 through 7; the last healthy slot is preferred on later requests, and other available slots are tried only after bounded failures with exponential backoff for transient errors. Never commit secret values or expose them in logs. Slot status reports only configured/empty state and sanitized runtime counters, never key values. `GEMINI_MODEL` must be the API model ID (not a display name); omit the `models/` prefix when copying a name from the model list. Format validation does not prove that the model is accessible. The optional preflight performs one minimal real provider request and must only be run when you choose to spend API quota.
 
-Timeouts, network errors and key-specific credential errors rotate to another available slot. Rate-limit responses also try a bounded number of slots, but Gemini rate limits are project-scoped: keys from the same Google AI project share quotas, so rotation only helps when another slot has a usable independent project/quota. Explicit project-wide quota or billing errors, invalid models and invalid requests stop early. Cooldowns and the last successful slot are held in server-process memory and reset when the process restarts.
+Timeouts, network errors and key-specific credential errors rotate to another available slot. Generic rate-limit responses try a bounded number of slots; when upstream error details explicitly identify a project-wide quota or billing limit, retries stop because other keys for that project cannot fix it. Error details do not always identify quota scope, so an ambiguous 429 is treated as a key-slot rate limit and may try another slot. Invalid models and invalid requests stop early. Cooldowns and the last successful slot are held in server-process memory and reset when the process restarts.
 
 ## Safety model
 
@@ -51,10 +51,10 @@ The original `agent` command remains a deliberately narrow repair mode. `agent:u
 
 ## Environment controls
 
-- `GEMINI_MODEL`: required model name; model is not hard-coded.
+- `GEMINI_MODEL`: required API model ID; no specific model name is hard-coded.
 - `GEMINI_API_KEY_1` … `GEMINI_API_KEY_7`: private key slots.
 - `GEMINI_API_KEY`: legacy fallback.
-- `GEMINI_MAX_RETRIES=6`: extra key attempts, capped at seven total and limited to configured slots.
+- `GEMINI_MAX_RETRIES=3`: extra key attempts, capped at six and limited to configured slots; set 6 to allow all seven slots.
 - `GEMINI_REQUEST_TIMEOUT_MS=60000`: model request timeout.
 - `GEMINI_KEY_COOLDOWN_MS=60000`: cooldown for a failing key slot.
 - `AGENT_AUTO_SCAN=true`: enable scans in watch mode.
