@@ -341,3 +341,15 @@ The existing Codespace preview remains running against `/tmp/mynutri-codespace-p
 
 - `git diff --check` passes, and the local source has passed the checks above.
 - The branch has not yet been committed or pushed in this run. No PR, remote CI run, merge, or permanent deployment is claimed here; record those outcomes only after the corresponding GitHub operations are completed and verified.
+
+### Final follow-up — 2026-10-14 (Asia/Kolkata)
+
+This follow-up supersedes the publication, test-count, and post-fix task-reporting statements in the preceding section.
+
+- The existing branch remains `codex/nutrition-completion-20261013`, based on `origin/main` at `859c7c89b8b6fbb659b0beba5f9e34e532219cca`. The implementation and focused follow-up commits are pushed to the same remote branch; the verified source tip before this report-only update is `df5abd7bb5e6d2746646aa0e87fe39d1440a4dcc`. No branch was created, and the unrelated integration worktree remains untouched.
+- An authenticated in-app Gemini task (`df3eb75d-21f6-412c-a64b-b80eb486b2c7`) succeeded on that branch. It changed exactly `docs/SELF_HEALING_AGENT.md` and `tests/agent-task-files.test.ts`; task history reported both complete paths, and lint, typecheck, tests, and build all passed.
+- The preceding end-to-end task exposed that `.trim()` removed the leading Git porcelain status column and caused the first character of changed paths to be omitted. `src/lib/agent/task-runner.ts` now preserves leading output whitespace and uses a validated porcelain-path parser; regression coverage includes modified, untracked, staged, and space-containing paths. The existing security assertions altered by the generated follow-up task were restored.
+- Final `npm run agent:doctor` passed lint, typecheck, all 125 tests across 24 files, and the production build. `git diff --check` passed. No dependency, lockfile, environment, database, photo, export, or private-log files are part of the change.
+- The real bounded Gemini provider preflight and synthetic food-analysis/save/retry/history/undo flow had passed earlier against the isolated preview database. These did not use private food history or photos. Browser automation and real-photo recognition remain unverified.
+- The Codespace development preview was restarted with the verified agent-enabled production build; `/login` and `/api/health` returned HTTP 200 on port 3000. Forwarded URL: `https://obscure-giggle-r765jvjjgwjj25gpx-3000.app.github.dev`. It is a development preview, not a permanent public deployment.
+- At the last pre-publication lookup there was no open PR from this branch. The branch push was verified, but PR creation, remote CI, and merge are still pending; report those only after they occur.
