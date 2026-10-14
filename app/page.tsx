@@ -42,7 +42,7 @@ export default function Home(){
   }catch(e){setError(e instanceof Error?e.message:"Unable to load saved data.");}finally{setLoading(false);}
  },[date]);
  useEffect(()=>{const timer=window.setTimeout(()=>{void refresh();},0);return()=>window.clearTimeout(timer);},[refresh]);
- 
+
  useEffect(()=>{if(view==="Settings"&&!provider)fetch("/api/provider-status").then(r=>r.json()).then(setProvider).catch(()=>setProvider({configured:false,message:"Provider status unavailable."}));},[view,provider]);
  useEffect(()=>{if(view!=="Calendar & History")return;fetch("/api/history?month="+encodeURIComponent(date.slice(0,7)),{cache:"no-store"}).then(r=>r.json()).then(p=>setHistoryDays(p.days||[])).catch(()=>setHistoryDays([]));},[view,date]);
  useEffect(()=>{if(view!=="Weight & Growth"&&view!=="Nutrient Analysis"&&view!=="Reports & Export")return;const controller=new AbortController();fetch("/api/trends?date="+encodeURIComponent(date)+"&days="+encodeURIComponent(trendDays),{cache:"no-store",signal:controller.signal}).then(async r=>{const p=await r.json();if(!r.ok)throw new Error(p.error||"Trend data could not load.");return p;}).then(p=>setTrendData(p)).catch(e=>{if(e instanceof Error&&e.name==="AbortError")return;setTrendData({error:"Historical trend data could not load."});});return()=>controller.abort();},[view,date,trendDays]);

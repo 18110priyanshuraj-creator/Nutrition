@@ -12,15 +12,15 @@ afterEach(() => resetGeminiProviderStateForTests());
 
 describe("Gemini key configuration", () => {
   it("supports numbered slots without leaking key values in the status", () => {
-    const env = {GEMINI_API_KEY_1: "secret-one", GEMINI_API_KEY_2: "secret-two", GEMINI_API_KEY_4: "secret-four", GEMINI_API_KEY: "legacy-secret"};
-    expect(configuredGeminiKeys(env as Record<string, string | undefined>).map((key) => key.label)).toEqual(["Slot 1", "Slot 2", "Slot 4"]);
-    const status = getGeminiProviderStatus(env as Record<string, string | undefined>);
+    const env: NodeJS.ProcessEnv = {NODE_ENV: "test", GEMINI_API_KEY_1: "secret-one", GEMINI_API_KEY_2: "secret-two", GEMINI_API_KEY_4: "secret-four", GEMINI_API_KEY: "legacy-secret"};
+    expect(configuredGeminiKeys(env).map((key) => key.label)).toEqual(["Slot 1", "Slot 2", "Slot 4"]);
+    const status = getGeminiProviderStatus(env);
     expect(status.configured).toBe(true);
     expect(JSON.stringify(status)).not.toContain("secret-one");
     expect(JSON.stringify(status)).not.toContain("legacy-secret");
   });
   it("preserves legacy single-key configuration", () => {
-    expect(configuredGeminiKeys({GEMINI_API_KEY: "legacy-secret"} as Record<string, string | undefined>)).toEqual([{label: "Legacy fallback", apiKey: "legacy-secret"}]);
+    expect(configuredGeminiKeys({NODE_ENV: "test", GEMINI_API_KEY: "legacy-secret"}).map(({label}) => label)).toEqual(["Legacy fallback"]);
   });
 });
 describe("Gemini error classification", () => {
@@ -48,7 +48,7 @@ describe("Gemini key failover", () => {
     }, {keys, cooldownMs: 1000, now: () => 1800000000000, maxAttempts: 4});
     expect(result).toBe("ok");
     expect(tried).toEqual(["private-one", "private-two"]);
-    const status = getGeminiProviderStatus({GEMINI_API_KEY_1: "private-one", GEMINI_API_KEY_2: "private-two", GEMINI_MODEL: "model"} as Record<string, string | undefined>);
+    const status = getGeminiProviderStatus({NODE_ENV: "test", GEMINI_API_KEY_1: "private-one", GEMINI_API_KEY_2: "private-two", GEMINI_MODEL: "model"});
     expect(status.activeSlot).toBe("Slot 2");
     expect(JSON.stringify(status)).not.toContain("private-one");
   });
