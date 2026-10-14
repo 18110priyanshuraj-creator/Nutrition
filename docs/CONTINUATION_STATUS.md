@@ -226,3 +226,39 @@ This continuation adds the in-app repository task surface while preserving the e
 | Browser automation, real photo UX, hosted deployment, complete Copilot SDK connection | NOT VERIFIED / NOT IMPLEMENTED | No browser automation or screenshot tool was available. The app does not connect to the VS Code Copilot runtime through undocumented IPC; the available in-app engine is the existing Gemini CLI. |
 
 The working tree contains both the pre-existing local work and these uncommitted integration changes. `.env.local`, user nutrition records, photos, and SQLite/WAL files were not included in Git changes or printed. Re-run the Gemini preflight only when upstream generation is expected to respond; do not mark the coding agent or photo analysis live until a real request succeeds.
+
+## Canonical main integration — 2026-10-14 (Asia/Kolkata)
+
+The actual remote is `https://github.com/18110priyanshuraj-creator/Nutrition`; `git ls-remote --symref origin HEAD` confirms `main` as its default branch. This differs from the owner/repository spelling in the task text. All source tips are preserved by local refs under `refs/recovery/20261014/` and are reachable from the isolated branch `integration/nutrition-completion-20261014`.
+
+| Remote branch | Original full SHA | Unique commits vs current development | Integration outcome |
+|---|---|---:|---|
+| `codex/nutrition-completion-20261013` | `8ba1c5b82fc7e3ba5daa2f8616f3815dd27ed836` | 0 | Merged from canonical `main` by `dabf1fd2db772600d78dcb43660fface3dad413f`; carries the existing nutrition app, auth, database, UI, agent and tests. |
+| `codex/mynutri-ai-foundation` | `08c577e87f6bd743e3b601dde295eedf6fa62a75` | 0 | Ancestor of development; its Codespace sync/setup documentation is included through the development merge. |
+| `codespace-expert-couscous-gx7pw9xv7qqfwgp6` | `ba95e545a6f280a1bd9fe0530338142798344370` | 0 | Ancestor of development. Exported Codespace setup, lockfile, tasks and tests are included through that history. |
+| `temp/nutrition-export-bundle` | `ba95e545a6f280a1bd9fe0530338142798344370` | 0 | Same exact tip as the Codespace export branch; its artifacts and documentation are included through development history. |
+| `codex/self-healing-agent` | `10efa00ffc198508e4d3688ac151d33065bf15f2` | 5 | Merged as second parent of `e4df2722f99f6babf6dd09e92b63a5d090379e42`. Retained its history and failover regression cases while keeping the newer seven-slot provider and guarded CLI/API implementations. |
+| `feature/copilot-agent-upgrade` | `d4bb5479d5568a78dd6d4280e4755ec5f2e8fafd` | 26 | Merged as second parent of `85297b9a6031901d05271174ae67e4d15ceeeb90`. Retained its history; the current runner and guardrail tests cover deleted/pre-existing files, symlinks, protected paths, secret redaction, validated shell-free commands, and checkpoint recovery. |
+
+The verified code-integration commit is `a9801025186f35ee29858da8e65a01da9671da14`; this audit report is recorded in the following documentation commit. The old four-key self-healing implementation and superseded README/guide versions were not copied over the current seven-key implementation; the old export and setup artifacts remain represented by their commits and current documentation. Every one of the six source refs was verified as an ancestor of the code-integration commit.
+
+### Verification on the integrated tree
+
+| Check | Result |
+|---|---|
+| `npm test` | PASS — 23 files, 111 tests. |
+| `npm run lint` | PASS. |
+| `npm run typecheck` | PASS after correcting the added failover test fixtures to `NodeJS.ProcessEnv`. |
+| `NODE_ENV=production npm run build` | PASS on Next.js 16.4.0. The first attempt used a cross-worktree `node_modules` symlink rejected by Turbopack; the build passed with dependencies materialized locally. The generated `next-env.d.ts` change was restored. |
+| Disposable migration | PASS — migrations 0001–0005 applied; SQLite `integrity_check` returned `ok`. The temporary database was removed; the user database was not used. |
+| Production HTTP smoke | PASS on temporary port 3190/database with test-only credentials: health 200 (`Asia/Kolkata`), login page 200, unauthenticated dashboard API 401, login 200, authenticated dashboard API 200 and dashboard page 200. The server was stopped and the temporary database removed. |
+| Agent CLI | PASS — `npm run agent -- --help`. |
+| Diff/secret/data review | PASS — no whitespace errors after cleanup; no private environment or database files in the integration diff. Secret-pattern scan matches only test fixtures. |
+
+Live Gemini generation/photo recognition, browser/accessibility automation, and hosted deployment were not run. The existing provisional food catalog remains unverified IFCT/ICMR-NIN data; the import pathway is documented. No nutrition data was sent to an external provider.
+
+### Remote publication and cleanup
+
+The integration was ready for a normal fast-forward from the observed remote `main` at `6fcd7a5af058f7097d25ccb7f012cd26b2dea102`. Publication is BLOCKED: `gh auth status` reports no authenticated GitHub host, and `GIT_TERMINAL_PROMPT=0 git push origin HEAD:refs/heads/main` failed with `fatal: unable to get password from user`. A fresh `git ls-remote` confirms remote `main` and all six source refs remain unchanged. No remote branch deletion was attempted; the previously identified cleanup candidates (`codex/mynutri-ai-foundation`, `temp/nutrition-export-bundle`, and `codespace-expert-couscous-gx7pw9xv7qqfwgp6`) must remain until the verified integration is pushed and remote `main` is confirmed.
+
+The local integration worktree is on `integration/nutrition-completion-20261014`. The original development worktree remains on `codex/nutrition-completion-20261013`; its pre-existing uncommitted edit to this status document was left untouched.
