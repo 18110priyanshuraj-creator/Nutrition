@@ -258,12 +258,36 @@ The verified code-integration commit is `a9801025186f35ee29858da8e65a01da9671da1
 
 Live Gemini generation/photo recognition, browser/accessibility automation, and hosted deployment were not run. The existing provisional food catalog remains unverified IFCT/ICMR-NIN data; the import pathway is documented. No nutrition data was sent to an external provider.
 
-### Final publication and cleanup — in progress
+### Final publication and cleanup — complete
 
-This section supersedes the earlier publication-blocked note. The current Codespace session is authenticated to GitHub as the repository owner, and repository metadata grants push/admin permissions. The remote `main` was freshly confirmed at `6fcd7a5af058f7097d25ccb7f012cd26b2dea102`, with no protection reported. The remote `integration/nutrition-completion-20261014` branch was also present at `ef60c5b9fc23bc81a94870c6d0823f23d2464246`; it is retained as the active recovery branch. The proposed `main` update is a normal fast-forward; no force update is needed.
+The canonical repository is `18110priyanshuraj-creator/Nutrition`, with `main` as its default branch. Pull request #3 was merged after its CI passed. Its integration tip, `ef60c5b9fc23bc81a94870c6d0823f23d2464246`, is preserved in `main`; the follow-up status-document commit `b1b36c75e2edbbf7cc910cc3a9b8dc8a2f63008e` is the application verification anchor. GitHub Actions run [38549005649](https://github.com/18110priyanshuraj-creator/Nutrition/actions/runs/38549005649) passed on that exact `main` SHA, including dependency installation, agent CLI smoke checks, disposable migration smoke test, unit tests, lint, typecheck, and production build. The PR CI run [38548884687](https://github.com/18110priyanshuraj-creator/Nutrition/actions/runs/38548884687) also passed on the integration tip. This final report is a documentation-only follow-up. The Vercel PR preview check succeeded; this is not a production deployment.
 
-On the integrated tree, every test file was run separately with one forked Vitest worker to stay within this Codespace's process budget: 23 files and 111 tests passed. The added Gemini failover regression file passed all 6 tests. Full parallel test/typecheck/lint attempts were terminated by the shared environment, and an isolated `npm ci` was killed with exit 137; neither changed tracked files. The integration tree's prior recorded checks include successful lint, typecheck, production build, disposable migrations, and HTTP/auth smoke tests. GitHub CI on the final published `main` commit is the authoritative fresh build/typecheck/lint result and remains pending.
+#### Final remote branch inventory
 
-No remote branch has been deleted. Cleanup is intentionally deferred until the fast-forward is published, CI succeeds, and each branch tip is rechecked. Preserve the active `codex/nutrition-completion-20261013` branch. The closed PR source branches and both export branches are eligible for cleanup after remote `main` contains their verified merge ancestry and useful work.
+| Branch | Final disposition | Evidence |
+|---|---|---|
+| `main` | KEEP — application verification anchor `b1b36c75e2edbbf7cc910cc3a9b8dc8a2f63008e` | Canonical default branch; that exact SHA was verified on GitHub and its CI passed. |
+| `codex/nutrition-completion-20261013` | KEEP — `8ba1c5b82fc7e3ba5daa2f8616f3815dd27ed836` | Active development branch retained; its existing work and the pre-existing local continuation-document edit were preserved. |
+| `codex/mynutri-ai-foundation` | DELETED — `08c577e87f6bd743e3b601dde295eedf6fa62a75` | Exact tip is an ancestor of `main`; PRs #1 and #2 are closed; ref absence verified after deletion. |
+| `codex/self-healing-agent` | DELETED — `10efa00ffc198508e4d3688ac151d33065bf15f2` | Full source tip and failover work are in `main`; PR #1 is closed; ref absence verified. |
+| `feature/copilot-agent-upgrade` | DELETED — `d4bb5479d5568a78dd6d4280e4755ec5f2e8fafd` | Full source tip and upgrade/hardening work are in `main`; PR #2 is closed; ref absence verified. |
+| `temp/nutrition-export-bundle` | DELETED — `ba95e545a6f280a1bd9fe0530338142798344370` | Exact tip is also the Codespace export tip and is in `main`; ref absence verified. |
+| `codespace-expert-couscous-gx7pw9xv7qqfwgp6` | DELETED — `ba95e545a6f280a1bd9fe0530338142798344370` | Duplicate export tip is in `main`; ref absence verified. |
+| `integration/nutrition-completion-20261014` | DELETED remotely — `ef60c5b9fc23bc81a94870c6d0823f23d2464246` | PR #3 is merged and this exact tip is in `main`; remote ref absence verified. A local integration worktree remains as a recovery copy. |
 
-The isolated local integration worktree is on `integration/nutrition-completion-20261014`; the original development worktree remains on `codex/nutrition-completion-20261013` with its pre-existing uncommitted continuation-status edits preserved.
+All six deleted remote tips were re-read immediately before deletion, verified as ancestors of the expected `main` tip, and checked again for absence afterward. No open PRs remained. No local branch used by either existing worktree was removed.
+
+#### Final verification and limitations
+
+| Check | Result |
+|---|---|
+| Local unit tests | PASS — 23 files, 111 tests on the integrated tree with one Vitest worker. |
+| GitHub CI on integration PR | PASS — run 38548884687 on `ef60c5b9fc23bc81a94870c6d0823f23d2464246`. |
+| GitHub CI on published `main` | PASS — run 38549005649 on `b1b36c75e2edbbf7cc910cc3a9b8dc8a2f63008e`; dependency install, agent CLI, migration, tests, lint, typecheck, and build all succeeded. |
+| Disposable migration / app HTTP smoke | PASS in the prior integrated-tree verification recorded above; no user database was reset or migrated. |
+| Live Gemini generation and real photo recognition | BLOCKED / NOT VERIFIED — prior bounded generation timed out after model-list access; no live request or representative user photo was sent in this final consolidation. |
+| Verified IFCT/ICMR-NIN food dataset | NOT AVAILABLE — seed foods remain provisional estimates with source limitations documented. |
+| Browser/accessibility and production deployment | NOT RUN — the Vercel preview check is not evidence of production deployment. |
+| Local worktree | PRESERVED — the primary `codex/nutrition-completion-20261013` worktree still has its pre-existing uncommitted `docs/CONTINUATION_STATUS.md` edit. The integration worktree is retained at the published `main` content. |
+
+No application source changes were needed during this final consolidation. Existing application, migration, safety, and regression-test work from all verified source branches is preserved in `main`. Do not claim the provider, real-photo recognition, comprehensive official food data, accessibility, or production deployment is fully verified.
