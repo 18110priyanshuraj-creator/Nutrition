@@ -1,7 +1,7 @@
 # MyNutri AI — Implementation Plan
 
-Branch: `codex/nutrition-completion-20261013`
-Repository: https://github.com/priyasnshu/Nutrition
+Branch: `main`
+Repository: https://github.com/18110priyanshuraj-creator/Nutrition
 Last updated: 2026-10-14
 
 The latest verification state and the durable requirement checklist are in [`CONTINUATION_STATUS.md`](./CONTINUATION_STATUS.md). In particular, local lint/typecheck/tests/build and authenticated production API smoke checks passed; live Gemini `generateContent` remains blocked by a network timeout despite successful model listing.

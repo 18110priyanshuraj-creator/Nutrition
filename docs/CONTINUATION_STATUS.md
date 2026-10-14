@@ -4,10 +4,10 @@ Audit date: 2026-10-12 (Asia/Kolkata)
 
 ## Repository snapshot
 
-- Repository: https://github.com/priyasnshu/Nutrition
+- Repository: https://github.com/18110priyanshuraj-creator/Nutrition
 - Working branch: `codex/mynutri-ai-foundation`
 - Default branch: `main`
-- Implementation audit anchor before this continuation update: [`d29364ecf29b762b4463fa05b044d2245eabe999`](https://github.com/priyasnshu/Nutrition/commit/d29364ecf29b762b4463fa05b044d2245eabe999) — adds the regression test for unsupported import nutrient keys. The stricter importer validation is in parent commit [`23f07cf5163cb98f0ffbbaecd49c8071299609ae`](https://github.com/priyasnshu/Nutrition/commit/23f07cf5163cb98f0ffbbaecd49c8071299609ae).
+- Implementation audit anchor before this continuation update: [`d29364ecf29b762b4463fa05b044d2245eabe999`](https://github.com/18110priyanshuraj-creator/Nutrition/commit/d29364ecf29b762b4463fa05b044d2245eabe999) — adds the regression test for unsupported import nutrient keys. The stricter importer validation is in parent commit [`23f07cf5163cb98f0ffbbaecd49c8071299609ae`](https://github.com/18110priyanshuraj-creator/Nutrition/commit/23f07cf5163cb98f0ffbbaecd49c8071299609ae).
 - GitHub comparison at the start of the audit reported the feature branch 60 commits ahead of `main`, 0 behind.
 - Connected GitHub access reported read/write permission for this repository.
 - **Important workspace boundary:** the assistant execution container has no `/workspaces/Nutrition` checkout or `/workspaces` directory and could not resolve `github.com` from its shell. Therefore the Codespace's branch, HEAD, working-tree status, local diffs, and untracked files were **not verified**. Do not assume local and remote states match.
@@ -234,6 +234,7 @@ The actual remote is `https://github.com/18110priyanshuraj-creator/Nutrition`; `
 | Remote branch | Original full SHA | Unique commits vs current development | Integration outcome |
 |---|---|---:|---|
 | `codex/nutrition-completion-20261013` | `8ba1c5b82fc7e3ba5daa2f8616f3815dd27ed836` | 0 | Merged from canonical `main` by `dabf1fd2db772600d78dcb43660fface3dad413f`; carries the existing nutrition app, auth, database, UI, agent and tests. |
+| `integration/nutrition-completion-20261014` | `ef60c5b9fc23bc81a94870c6d0823f23d2464246` | 0 | Active recovery/integration branch; exact tip matches the isolated local integration worktree and is retained. |
 | `codex/mynutri-ai-foundation` | `08c577e87f6bd743e3b601dde295eedf6fa62a75` | 0 | Ancestor of development; its Codespace sync/setup documentation is included through the development merge. |
 | `codespace-expert-couscous-gx7pw9xv7qqfwgp6` | `ba95e545a6f280a1bd9fe0530338142798344370` | 0 | Ancestor of development. Exported Codespace setup, lockfile, tasks and tests are included through that history. |
 | `temp/nutrition-export-bundle` | `ba95e545a6f280a1bd9fe0530338142798344370` | 0 | Same exact tip as the Codespace export branch; its artifacts and documentation are included through development history. |
@@ -257,8 +258,12 @@ The verified code-integration commit is `a9801025186f35ee29858da8e65a01da9671da1
 
 Live Gemini generation/photo recognition, browser/accessibility automation, and hosted deployment were not run. The existing provisional food catalog remains unverified IFCT/ICMR-NIN data; the import pathway is documented. No nutrition data was sent to an external provider.
 
-### Remote publication and cleanup
+### Final publication and cleanup — in progress
 
-The integration was ready for a normal fast-forward from the observed remote `main` at `6fcd7a5af058f7097d25ccb7f012cd26b2dea102`. Publication is BLOCKED: `gh auth status` reports no authenticated GitHub host, and `GIT_TERMINAL_PROMPT=0 git push origin HEAD:refs/heads/main` failed with `fatal: unable to get password from user`. A fresh `git ls-remote` confirms remote `main` and all six source refs remain unchanged. No remote branch deletion was attempted; the previously identified cleanup candidates (`codex/mynutri-ai-foundation`, `temp/nutrition-export-bundle`, and `codespace-expert-couscous-gx7pw9xv7qqfwgp6`) must remain until the verified integration is pushed and remote `main` is confirmed.
+This section supersedes the earlier publication-blocked note. The current Codespace session is authenticated to GitHub as the repository owner, and repository metadata grants push/admin permissions. The remote `main` was freshly confirmed at `6fcd7a5af058f7097d25ccb7f012cd26b2dea102`, with no protection reported. The remote `integration/nutrition-completion-20261014` branch was also present at `ef60c5b9fc23bc81a94870c6d0823f23d2464246`; it is retained as the active recovery branch. The proposed `main` update is a normal fast-forward; no force update is needed.
 
-The local integration worktree is on `integration/nutrition-completion-20261014`. The original development worktree remains on `codex/nutrition-completion-20261013`; its pre-existing uncommitted edit to this status document was left untouched.
+On the integrated tree, every test file was run separately with one forked Vitest worker to stay within this Codespace's process budget: 23 files and 111 tests passed. The added Gemini failover regression file passed all 6 tests. Full parallel test/typecheck/lint attempts were terminated by the shared environment, and an isolated `npm ci` was killed with exit 137; neither changed tracked files. The integration tree's prior recorded checks include successful lint, typecheck, production build, disposable migrations, and HTTP/auth smoke tests. GitHub CI on the final published `main` commit is the authoritative fresh build/typecheck/lint result and remains pending.
+
+No remote branch has been deleted. Cleanup is intentionally deferred until the fast-forward is published, CI succeeds, and each branch tip is rechecked. Preserve the active `codex/nutrition-completion-20261013` branch. The closed PR source branches and both export branches are eligible for cleanup after remote `main` contains their verified merge ancestry and useful work.
+
+The isolated local integration worktree is on `integration/nutrition-completion-20261014`; the original development worktree remains on `codex/nutrition-completion-20261013` with its pre-existing uncommitted continuation-status edits preserved.
