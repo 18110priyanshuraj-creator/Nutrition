@@ -1,7 +1,12 @@
 import {describe, expect, it} from "vitest";
-import {changedTaskFiles} from "../src/lib/agent/task-files";
+import {changedTaskFiles, porcelainStatusPaths} from "../src/lib/agent/task-files";
 
 describe("repository-agent changed-file reporting", () => {
+  it("preserves the full path from Git porcelain status lines", () => {
+    expect(porcelainStatusPaths(" M tests/agent-task-routes.test.ts\n?? docs/new-agent-check.md\n"))
+      .toEqual(["tests/agent-task-routes.test.ts", "docs/new-agent-check.md"]);
+  });
+
   it("detects content changes to files that were already dirty at submission time", () => {
     const baseline = JSON.stringify({
       "README.md": "before-readme",

@@ -5,7 +5,7 @@ import {lstatSync, readFileSync} from "node:fs";
 import {join} from "node:path";
 import {getDb} from "../db";
 import {redactSecrets} from "./secret-redaction";
-import {changedTaskFiles, type TaskFileSnapshot} from "./task-files";
+import {changedTaskFiles, porcelainStatusPaths, type TaskFileSnapshot} from "./task-files";
 
 export type AgentTaskStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled" | "interrupted";
 type TaskRow = {
@@ -112,13 +112,14 @@ function present(row: TaskRow): AgentTask {
 }
 function git(args: string[]): string {
   try {
-    return execFileSync("git", args, {cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 10_000}).trim();
+    return execFileSync("git", args, {cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 10_000})
+      .replace(/(?:\r?\n)+$/, "");
   } catch (error) {
     throw new Error(redactSecrets(error instanceof Error ? error.message : String(error)));
   }
 }
 function currentFiles(): string[] {
-  return git(["status", "--porcelain=v1", "--untracked-files=all"]).split("\n").filter(Boolean).map((line) => line.slice(3).trim().replace(/^"(.*)"$/, "$1"));
+  return porcelainStatusPaths(git(["status", "--porcelain=v1", "--untracked-files=all"]));
 }
 function reportableTaskPath(path: string): boolean {
   if (!path || path.includes("\0") || path.startsWith("/") || path.includes("\\")

@@ -1,5 +1,14 @@
 export type TaskFileSnapshot = Record<string, string | null>;
 
+export function porcelainStatusPaths(output: string): string[] {
+  return output.split(/\r?\n/).filter(Boolean).map((line) => {
+    if (line.length < 4 || line[2] !== " ") {
+      throw new Error("Git returned an invalid porcelain status line.");
+    }
+    return line.slice(3).replace(/^"(.*)"$/, "$1");
+  });
+}
+
 export function changedTaskFiles(baselineJson: string, current: TaskFileSnapshot): string[] {
   let parsed: unknown;
   try {

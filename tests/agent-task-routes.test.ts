@@ -57,6 +57,29 @@ describe("owner-authorized repository agent routes", () => {
     expect(body.tasks).toEqual([]);
   });
 
+  it("returns completed tasks with their changed files unchanged", async () => {
+    mocked.list.mockReturnValue([
+      {
+        id: "task-completed-1",
+        status: "completed",
+        request: "Update docs and tests",
+        changedFiles: ["README.md", "tests/database-smoke.test.ts"],
+      },
+    ]);
+    const response = await GET(new Request("http://localhost/api/agent/tasks"));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.tasks).toEqual([
+      expect.objectContaining({
+        id: "task-completed-1",
+        status: "completed",
+        changedFiles: ["README.md", "tests/database-smoke.test.ts"],
+      }),
+    ]);
+    expect(body.tasks[0].changedFiles).toContain("README.md");
+    expect(body.tasks[0].changedFiles).toContain("tests/database-smoke.test.ts");
+  });
+
   it("requires a same-origin explicit repository task", async () => {
     const crossOrigin = await POST(new Request("http://localhost/api/agent/tasks", {
       method: "POST",
