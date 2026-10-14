@@ -7,6 +7,11 @@ describe("repository-agent changed-file reporting", () => {
       .toEqual(["tests/agent-task-routes.test.ts", "docs/new-agent-check.md"]);
   });
 
+  it("asserts porcelainStatusPaths handles paths with spaces correctly", () => {
+    expect(porcelainStatusPaths("MM src/lib/agent/task runner.ts\n"))
+      .toEqual(["src/lib/agent/task runner.ts"]);
+  });
+
   it("detects content changes to files that were already dirty at submission time", () => {
     const baseline = JSON.stringify({
       "README.md": "before-readme",
