@@ -27,6 +27,12 @@ const envNames = [
   "GEMINI_MAX_RETRIES", "GEMINI_KEY_COOLDOWN_MS", "GEMINI_REQUEST_TIMEOUT_MS",
 ] as const;
 const original = new Map<string, string | undefined>();
+let requestCounter = 1;
+
+function testIp(): string {
+  const value = requestCounter++;
+  return `192.0.2.${value}`;
+}
 
 beforeEach(() => {
   original.clear();
@@ -50,7 +56,7 @@ afterEach(() => {
 function request(text: string): NextRequest {
   return new NextRequest("http://localhost/api/analyze", {
     method: "POST",
-    headers: {"content-type": "application/json"},
+    headers: {"content-type": "application/json", "x-forwarded-for": testIp()},
     body: JSON.stringify({text}),
   });
 }
@@ -60,7 +66,7 @@ function imageRequest(): NextRequest {
   const pngSignature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
   form.append("image", new File([pngSignature], "meal.png", {type: "image/png"}));
   form.append("description", "A banana");
-  return new NextRequest("http://localhost/api/analyze", {method: "POST", body: form});
+  return new NextRequest("http://localhost/api/analyze", {method: "POST", headers: {"x-forwarded-for": testIp()}, body: form});
 }
 
 describe("food analysis without Gemini credentials", () => {
@@ -79,6 +85,41 @@ describe("food analysis without Gemini credentials", () => {
 });
 
 describe("food analysis through the shared Gemini keyring", () => {
+  it("automatically falls back to supported local text matches when Gemini is unavailable", async () => {
+    process.env.GEMINI_API_KEY_1 = "private-photo-test-key";
+    process.env.GEMINI_MODEL = "gemini-3.5-flash-lite";
+    mocked.generateContent.mockRejectedValue(new Error("fetch failed"));
+
+    const response = await POST(request("6 badam"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.mode).toBe("local_match");
+    expect(body.warning).toContain("Gemini analysis failed (network)");
+    expect(body.warning).toContain("Only local catalog matches were used");
+    expect(body.candidates).toMatchObject([
+      {foodId: "almonds", grams: 7.2, portionEstimated: true, portionSource: "estimated"},
+    ]);
+    expect(JSON.stringify(body)).not.toContain("private-photo-test-key");
+    expect(JSON.stringify(body)).not.toContain("fetch failed");
+  });
+
+  it("keeps provider errors explicit when no safe local match is available", async () => {
+    process.env.GEMINI_API_KEY_1 = "private-photo-test-key";
+    process.env.GEMINI_MODEL = "gemini-3.5-flash-lite";
+    mocked.generateContent.mockRejectedValue(new Error("fetch failed"));
+
+    const response = await POST(request("an unfamiliar food phrase"));
+    const body = await response.json();
+
+    expect(response.status).toBe(504);
+    expect(body.category).toBe("network");
+    expect(body.manualEntryAvailable).toBe(true);
+    expect(body.error).toContain("timed out or failed temporarily");
+    expect(JSON.stringify(body)).not.toContain("private-photo-test-key");
+    expect(JSON.stringify(body)).not.toContain("fetch failed");
+  });
+
   it("uses supported text portions instead of implausible model weights", async () => {
     process.env.GEMINI_API_KEY_1 = "private-photo-test-key";
     process.env.GEMINI_MODEL = "gemini-3.5-flash-lite";

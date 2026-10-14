@@ -1,4 +1,4 @@
-import {beforeEach, describe, expect, it, vi} from "vitest";
+import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {GET, POST} from "../app/api/agent/tasks/route";
 import {POST as controlTask} from "../app/api/agent/tasks/[id]/route";
 
@@ -29,14 +29,29 @@ vi.mock("@/lib/agent/gemini-provider", () => ({
 
 const sameOrigin = {origin: "http://localhost"};
 const syntheticApiKey = "AIza" + "012345678901234567890123456789";
+const codespaceEnv = ["CODESPACES", "CODESPACE_NAME", "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN"] as const;
+const originalCodespaceEnv = new Map<string, string | undefined>();
 
 beforeEach(() => {
+  originalCodespaceEnv.clear();
+  for (const name of codespaceEnv) {
+    originalCodespaceEnv.set(name, process.env[name]);
+    delete process.env[name];
+  }
   mocked.owner = true;
   mocked.enabled = true;
   mocked.create.mockReset();
   mocked.list.mockReset().mockReturnValue([]);
   mocked.cancel.mockReset();
   mocked.resume.mockReset();
+});
+
+afterEach(() => {
+  for (const name of codespaceEnv) {
+    const value = originalCodespaceEnv.get(name);
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
 });
 
 describe("owner-authorized repository agent routes", () => {
@@ -103,6 +118,9 @@ describe("owner-authorized repository agent routes", () => {
   });
 
   it("accepts the browser origin forwarded by a Codespace reverse proxy", async () => {
+    process.env.CODESPACES = "true";
+    process.env.CODESPACE_NAME = "nutrition";
+    process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN = "app.github.dev";
     const response = await POST(new Request("http://127.0.0.1:3100/api/agent/tasks", {
       method: "POST",
       headers: {
