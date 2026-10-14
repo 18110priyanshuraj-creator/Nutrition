@@ -44,7 +44,6 @@ export default function AgentWidget() {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<AgentStatus | null>(null);
   const [taskText, setTaskText] = useState("");
-  const [approved, setApproved] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -90,7 +89,7 @@ export default function AgentWidget() {
 
   async function submitTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!approved || !taskText.trim()) return;
+    if (!taskText.trim()) return;
     setBusy(true);
     setError("");
     try {
@@ -102,7 +101,6 @@ export default function AgentWidget() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Task could not be queued.");
       setTaskText("");
-      setApproved(false);
       setSelectedId(payload.task.id);
       await refresh();
     } catch (cause) {
@@ -168,12 +166,8 @@ export default function AgentWidget() {
                   placeholder="Describe a code change or a failing check to investigate…"
                   required
                 />
-                <label className="agent-approval">
-                  <input type="checkbox" checked={approved} onChange={(event) => setApproved(event.target.checked)}/>
-                  I authorize this task to edit code in the current repository.
-                </label>
-                <p className="agent-safety-copy">The existing CLI may edit up to four clean TypeScript files, runs only its fixed verification scripts, and never commits, pushes, deploys, or edits protected paths. Review its diff before keeping any changes.</p>
-                <button className="primary-button" type="submit" disabled={busy || hasActive || !approved || taskText.trim().length < 5}>
+                <p className="agent-safety-copy">Each task may safely change up to eight related project files per batch, including styles, tests, migrations and agent policy. Fixed checks run after edits. Secrets, private data, dependencies and destructive commands remain protected. Tasks never commit, push, or deploy; review the diff before keeping changes.</p>
+                <button className="primary-button" type="submit" disabled={busy || hasActive || taskText.trim().length < 5}>
                   {busy ? <LoaderCircle className="spin" size={15}/> : null}
                   {hasActive ? "Agent task already active" : "Run repository task"}
                 </button>

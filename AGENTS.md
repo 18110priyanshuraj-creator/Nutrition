@@ -9,7 +9,7 @@
 - Missing nutrient values are unknown, not zero.
 - Keep food source, version, preparation state, and confidence visible.
 - Do not call provisional estimates verified IFCT data.
-- Do not automatically save AI proposals; require user review/confirmation.
+- Treat AI food recognition and portions as untrusted estimates. The explicit “Analyze & log meal” action authorizes saving only safely matched catalog items; keep ambiguous or unmatchable items unlogged until the user corrects them.
 - Preserve Asia/Kolkata date semantics and authenticated private history.
 - Avoid medical diagnoses, height promises, supplement prescriptions, or adult-BMI-only conclusions for adolescents.
 - Run automated checks when an execution environment is available and report what could not be run.

@@ -32,6 +32,10 @@ export function mealsForDate(date:string):Record<string,unknown>[] {
   const rows=db.prepare("SELECT * FROM meal_items WHERE meal_id=? ORDER BY created_at ASC").all(log.id) as Record<string,unknown>[];
   const items=rows.map((row)=>({
    id:row.id,foodId:row.food_id,foodName:row.food_name,grams:row.grams,
+   portionAmount:row.portion_amount??null,portionUnit:row.portion_unit??null,
+   portionSource:row.portion_source??(row.portion_estimated?"estimated":"manual"),
+   preparation:row.preparation_snapshot??"as described",
+   portionNote:row.portion_note??"",
    nutrients:readJson<Record<string,number>>(String(row.nutrients_json),{}),
    source:row.source_snapshot,confidence:row.confidence_snapshot,portionEstimated:Boolean(row.portion_estimated)
   }));

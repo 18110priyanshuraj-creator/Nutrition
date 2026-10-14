@@ -1,6 +1,6 @@
 # Run the autonomous agent in GitHub Codespaces
 
-Use this guide in the **existing** /workspaces/Nutrition Codespace. The upgrade runs on the current checkout and does not create or push branches.
+Use this guide in the **existing** `/workspaces/Nutrition` Codespace. Keep working on `codex/nutrition-completion-20261013`; do not create a replacement branch. The agent does not create, push, or merge branches.
 
 ## 1. Check the current worktree before syncing
 
@@ -10,21 +10,17 @@ git status --short
 git branch --show-current
 git fetch origin
 git log -1 --oneline HEAD
-git log -1 --oneline origin/codex/mynutri-ai-foundation
+git log -1 --oneline origin/main
+git rev-list --left-right --count HEAD...origin/main
 ```
 
-If git status --short shows files, preserve them before updating. The commands below keep a stash copy and do not reset/clean the checkout:
+Preserve and inspect every changed or untracked file before syncing. If local commits are strictly behind `origin/main`, first ensure the worktree is clean or recoverably saved, then use a fast-forward-only update on the existing branch:
 
 ```bash
-git stash push -u -m "backup-before-agent-upgrade-sync"
-git fetch origin && git merge --ff-only origin/codex/mynutri-ai-foundation && git stash apply
-git stash list
-git status --short
+git merge --ff-only origin/main
 ```
 
-- A fast-forward merge is deliberately used: if the local branch has diverged, Git refuses instead of rewriting history. The chained command stops before stash apply when fetch/merge fails.
-- git stash apply does not delete the backup stash. If the merge is refused, stop and leave the stash in place until the branch divergence is reviewed. If stash apply reports conflicts, the stash is still available and files are not intentionally discarded.
-- A stash does not contain ignored files such as .env or data/; it does not delete or replace them.
+- If the worktree is dirty or the branch has diverged, stop and diagnose before updating. Do not use reset, clean, force-push, or history rewriting. Keep the existing branch and reconcile changes without overwriting user work.
 
 ## 2. Configure Gemini privately
 
@@ -75,18 +71,12 @@ Reports and verified lessons are written locally under ignored .agent/upgrade-re
 
 The authenticated app's bottom-right **N** button opens the repository task runner. The Next.js API in this Codespace invokes the existing `scripts/agent.ts` Gemini coding agent in the same repository process environment; it does not connect to the VS Code Copilot chat/session or expose a terminal port. The nutrition assistant remains separate and unchanged.
 
-The service is enabled only when `CODESPACES=true` or `MYNUTRI_ENABLE_AGENT=true`. Do not enable it on a publicly hosted application. Both task endpoints require the owner session and same-origin POSTs. Credential-bearing task requests are rejected, captured output is redacted, and provider keys are never returned to the browser. Task state, check results, branch/commit, bounded logs and changed-file paths are stored in the existing SQLite database by migration `0005_agent_tasks.sql`.
+The service is enabled only when `CODESPACES=true` or `MYNUTRI_ENABLE_AGENT=true`. Do not enable it on a publicly hosted application. Both task endpoints require the owner session and same-origin POSTs. Credential-bearing task requests are rejected, captured output is redacted, and provider keys are never returned to the browser. Task state, check results, branch/commit, bounded logs and changed-file paths are stored in the existing SQLite database; task metadata is added by migration `0005_agent_tasks.sql`.
 
-Execution is intentionally limited: one task runs at a time with at most one queued task, the worker stops after one hour, and at most two explicit resume attempts are accepted. The existing CLI runs only its fixed lint/typecheck/test/build checks, does not execute model-supplied shell commands, and may edit at most four **clean, tracked** TypeScript files. Authentication, data deletion/restore, provider settings, task-service, database, migration, environment and agent-core paths are protected. Existing dirty files are never patched. No commit, push, deploy, database migration command or production operation is run by a task. Agent builds use `.next-agent-check` so they do not overwrite a running app's `.next` output.
+Execution is intentionally bounded: one task runs at a time with a maximum of one queued task, the worker stops after one hour, and at most two explicit resume attempts are accepted. The CLI may edit up to eight related files per patch, including app/auth/database source, SQL migrations, styles, configuration, tests, docs, CI, and agent internals. Each patch has path, symlink, schema, secret, and size validation; existing tracked edits are compared against their original diff and conflicts are refused without overwriting them. Existing untracked files, environment/secrets, databases and private records, photos/exports, dependencies, generated output, caches, and Git internals remain protected. Agent changes run the fixed lint/typecheck/test/build checks; migration tests use disposable databases. There is no arbitrary shell, dependency installation, production database operation, commit, push, deploy, or merge capability. Agent builds use `.next-agent-check` so they do not overwrite a running app's `.next` output.
 
 The widget displays configured provider state honestly: configured keys do not imply a live healthy provider. A failed Gemini request remains a task failure with sanitized logs; no mock response is substituted. After an app-worker restart, a running task is marked interrupted; inspect its branch/diff and choose **Resume** explicitly after the old process exits. Resume re-submits the saved request through the guarded CLI and its saved project memory; it is not a byte-for-byte continuation of a running model response.
 
-## Branch cleanup
+## Branch policy
 
-The old PRs are closed, but the remote-edit connector available in this workflow cannot delete branch refs directly. Once you have confirmed the active branch is up to date, remove only the two superseded remote refs with:
-
-```bash
-git push origin --delete feature/copilot-agent-upgrade codex/self-healing-agent
-```
-
-That command deletes the remote refs only; it does not delete your current branch or your working files.
+Keep the existing development branch. Do not delete remote branches as an incidental cleanup step; inspect the current branch inventory and preserve every branch unless its owner explicitly authorizes a separate cleanup.

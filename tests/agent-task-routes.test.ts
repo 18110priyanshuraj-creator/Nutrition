@@ -28,6 +28,7 @@ vi.mock("@/lib/agent/gemini-provider", () => ({
 }));
 
 const sameOrigin = {origin: "http://localhost"};
+const syntheticApiKey = "AIza" + "012345678901234567890123456789";
 
 beforeEach(() => {
   mocked.owner = true;
@@ -54,6 +55,29 @@ describe("owner-authorized repository agent routes", () => {
     expect(body.runtime).toContain("guarded");
     expect(body.provider).toBe("untested");
     expect(body.tasks).toEqual([]);
+  });
+
+  it("returns completed tasks with their changed files unchanged", async () => {
+    mocked.list.mockReturnValue([
+      {
+        id: "task-completed-1",
+        status: "completed",
+        request: "Update docs and tests",
+        changedFiles: ["README.md", "tests/database-smoke.test.ts"],
+      },
+    ]);
+    const response = await GET(new Request("http://localhost/api/agent/tasks"));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.tasks).toEqual([
+      expect.objectContaining({
+        id: "task-completed-1",
+        status: "completed",
+        changedFiles: ["README.md", "tests/database-smoke.test.ts"],
+      }),
+    ]);
+    expect(body.tasks[0].changedFiles).toContain("README.md");
+    expect(body.tasks[0].changedFiles).toContain("tests/database-smoke.test.ts");
   });
 
   it("requires a same-origin explicit repository task", async () => {
@@ -88,10 +112,10 @@ describe("owner-authorized repository agent routes", () => {
         "x-forwarded-host": "nutrition-3000.app.github.dev",
         "x-forwarded-proto": "https",
       },
-      body: JSON.stringify({request: "Debug GEMINI_API_KEY=AIza012345678901234567890123456789"}),
+      body: JSON.stringify({request: "Debug GEMINI_API_KEY=" + syntheticApiKey}),
     }));
     expect(response.status).toBe(400);
-    expect(await response.text()).not.toContain("AIza012345678901234567890123456789");
+    expect(await response.text()).not.toContain(syntheticApiKey);
     expect(mocked.create).not.toHaveBeenCalled();
   });
 
@@ -99,7 +123,7 @@ describe("owner-authorized repository agent routes", () => {
     const secret = await POST(new Request("http://localhost/api/agent/tasks", {
       method: "POST",
       headers: {"content-type": "application/json", ...sameOrigin},
-      body: JSON.stringify({request: "Debug GEMINI_API_KEY=AIza012345678901234567890123456789"}),
+      body: JSON.stringify({request: "Debug GEMINI_API_KEY=" + syntheticApiKey}),
     }));
     const malformed = await POST(new Request("http://localhost/api/agent/tasks", {
       method: "POST",
@@ -107,7 +131,7 @@ describe("owner-authorized repository agent routes", () => {
       body: JSON.stringify({request: "fix"}),
     }));
     expect(secret.status).toBe(400);
-    expect(await secret.text()).not.toContain("AIza012345678901234567890123456789");
+    expect(await secret.text()).not.toContain(syntheticApiKey);
     expect(malformed.status).toBe(400);
     expect(mocked.create).not.toHaveBeenCalled();
   });

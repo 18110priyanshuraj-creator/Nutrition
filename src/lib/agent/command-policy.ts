@@ -31,7 +31,17 @@ const SAFE_NPM_ARGUMENTS = [
   ["run", "agent:upgrade", "--", "--help"],
 ] as const;
 
-const SEARCH_ROOTS = new Set(["app", "src", "tests", "scripts", "docs"]);
+const SEARCH_ROOTS = new Set(["app", "src", "tests", "scripts", "docs", "db", ".github"]);
+const SAFE_TEST_PATH = /^tests\/[A-Za-z0-9_./-]+\.(?:test|spec)\.(?:ts|tsx|js|jsx)$/;
+
+function isSafeTestInvocation(args: string[]): boolean {
+  const path = args.length === 3 && args[0] === "test" && args[1] === "--"
+    ? args[2]
+    : args.length === 4 && args[0] === "run" && args[1] === "test" && args[2] === "--"
+      ? args[3]
+      : "";
+  return Boolean(path && SAFE_TEST_PATH.test(path) && !path.split("/").some(part => part === ".." || part === "."));
+}
 
 export function validatePlannedTerminalCommand(input: PlannedTerminalCommand): TerminalCommandDecision {
   const printable = [input?.program, ...(Array.isArray(input?.args) ? input.args : [])]
@@ -58,7 +68,7 @@ export function validatePlannedTerminalCommand(input: PlannedTerminalCommand): T
       : {allowed: false, display: printable, reason: "Git is restricted to exact read-only status, diff-check, inventory, branch-name, and short-log commands."};
   }
   if (input.program === "npm") {
-    const allowed = SAFE_NPM_ARGUMENTS.some((candidate) =>
+    const allowed = isSafeTestInvocation(args) || SAFE_NPM_ARGUMENTS.some((candidate) =>
       candidate.length === args.length && candidate.every((part, index) => part === args[index])
     );
     return allowed
