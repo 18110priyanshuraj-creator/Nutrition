@@ -1,0 +1,152 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "MyNutri Inspect Port 3000",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"-e",
+				"const cp=require(\"node:child_process\"); for(const [cmd,args] of [[\"ps\",[\"-eo\",\"pid,ppid,args\"]],[\"ss\",[\"-ltnp\"]]]){const r=cp.spawnSync(cmd,args,{encoding:\"utf8\"}); if(r.status!==0){console.log(cmd+\" unavailable\");continue;} const lines=(r.stdout||\"\").split(\"\\n\"); const found=cmd===\"ps\"?lines.filter(x=>/next (dev|start)|next-server/.test(x)&&!x.includes(\"Inspect Port\")):lines.filter(x=>/:3000\\\\b|:3000/.test(x)); console.log(\"$ \"+cmd+\" \"+args.join(\" \")); console.log(found.join(\"\\n\")||\"No matching process/listener\");}"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Stop Existing MyNutri Server",
+			"type": "shell",
+			"command": "kill",
+			"args": [
+				"-TERM",
+				"6102"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Verify MyNutri Port Released",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"-e",
+				"const cp=require(\"node:child_process\"); const ps=cp.spawnSync(\"ps\",[\"-eo\",\"pid,args\"],{encoding:\"utf8\"}).stdout||\"\"; console.log(ps.split(\"\\n\").filter(x=>/next (dev|start)|next-server/.test(x)&&!x.includes(\"Verify MyNutri\")).join(\"\\n\")||\"No Next server process\"); const port=cp.spawnSync(\"ss\",[\"-ltn\"],{encoding:\"utf8\"}).stdout||\"\"; const line=port.split(\"\\n\").find(x=>x.includes(\":3000\")); console.log(line||\"Port 3000 is released\"); if(line)process.exitCode=1;"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "MyNutri Dev Server Port 3000",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"dev"
+			],
+			"isBackground": true,
+			"problemMatcher": [
+				"$tsc-watch"
+			]
+		},
+		{
+			"label": "MyNutri Git Safety Check",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"-e",
+				"const cp=require(\"node:child_process\"); for(const args of [[\"status\",\"--short\"],[\"check-ignore\",\"--quiet\",\"--\",\".env.local\"],[\"branch\",\"--show-current\"]]){const r=cp.spawnSync(\"git\",args,{encoding:\"utf8\"});console.log(\"$ git \"+args.join(\" \")); if(args[0]===\"check-ignore\")console.log(r.status===0?\".env.local ignored\":\".env.local is NOT ignored\");else console.log((r.stdout||\"\").trimEnd()||\"(no output)\"); if(r.status!==0&&args[0]!==\"status\")process.exitCode=1;}"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "MyNutri Masked Password Check Again",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"configure:local",
+				"--",
+				"--status"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "MyNutri Port Status Current",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"-e",
+				"const cp=require(\"node:child_process\"); const p=cp.spawnSync(\"ps\",[\"-eo\",\"pid,ppid,args\"],{encoding:\"utf8\"}).stdout||\"\"; console.log(p.split(\"\\n\").filter(x=>/next (dev|start)|next-server/.test(x)&&!x.includes(\"Port Status Current\")).join(\"\\n\")||\"No Next server process\"); const s=cp.spawnSync(\"ss\",[\"-ltn\"],{encoding:\"utf8\"}).stdout||\"\"; console.log(s.split(\"\\n\").find(x=>x.includes(\":3000\"))||\"Port 3000 is released\");"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Stop MyNutri Dev Process for Password Reload",
+			"type": "shell",
+			"command": "kill",
+			"args": [
+				"-TERM",
+				"81622"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Verify Port Released for Password Reload",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"-e",
+				"const cp=require(\"node:child_process\");const p=cp.spawnSync(\"ps\",[\"-eo\",\"pid,ppid,args\"],{encoding:\"utf8\"}).stdout||\"\";console.log(p.split(\"\\n\").filter(x=>/next (dev|start)|next-server/.test(x)&&!x.includes(\"Port Released\")).join(\"\\n\")||\"No Next process\");const s=cp.spawnSync(\"ss\",[\"-ltn\"],{encoding:\"utf8\"}).stdout||\"\";console.log(s.split(\"\\n\").find(x=>x.includes(\":3000\"))||\"Port 3000 released\");"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Start MyNutri Dev Server Password Reload",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"dev"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "Verify Updated Local App Password",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"-e",
+				"const {loadEnvConfig}=require(\"@next/env\");loadEnvConfig(process.cwd());const base=\"http://127.0.0.1:3000\";const run=async()=>{const password=process.env.APP_PASSWORD;if(!password)throw Error(\"APP_PASSWORD unavailable\");const wrong=await fetch(base+\"/api/auth/login\",{method:\"POST\",headers:{\"content-type\":\"application/json\",\"x-forwarded-for\":\"192.0.2.210\"},body:JSON.stringify({password:\"not-the-configured-password\"})});console.log(\"incorrect-password login HTTP\",wrong.status);if(wrong.status!==401)throw Error(\"incorrect password did not fail\");const response=await fetch(base+\"/api/auth/login\",{method:\"POST\",headers:{\"content-type\":\"application/json\",\"x-forwarded-for\":\"192.0.2.211\"},body:JSON.stringify({password})});console.log(\"configured-password login HTTP\",response.status);if(response.status!==200)throw Error(\"configured password did not authenticate\");const cookie=response.headers.get(\"set-cookie\")?.split(\";\")[0];if(!cookie)throw Error(\"session cookie missing\");const dashboard=await fetch(base+\"/api/dashboard\",{headers:{cookie}});const data=await dashboard.json();console.log(\"authenticated dashboard HTTP\",dashboard.status,\"profile\",Boolean(data.profile),\"totals\",Boolean(data.totals));if(dashboard.status!==200||!data.profile||!data.totals)throw Error(\"authenticated dashboard failed\");};run().catch(e=>{console.error(e.message);process.exitCode=1})"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Final Password and Port Status",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"-e",
+				"const cp=require(\"node:child_process\");const ps=cp.spawnSync(\"ps\",[\"-eo\",\"pid,ppid,args\"],{encoding:\"utf8\"}).stdout||\"\";console.log(ps.split(\"\\n\").filter(x=>/next dev --hostname|next-server/.test(x)&&!x.includes(\"Password and Port\")).join(\"\\n\")||\"No Next dev process\");const sockets=cp.spawnSync(\"ss\",[\"-ltn\"],{encoding:\"utf8\"}).stdout||\"\";console.log(sockets.split(\"\\n\").find(x=>x.includes(\":3000\"))||\"Port 3000 is not listening\");fetch(\"http://127.0.0.1:3000/api/health\").then(async r=>{const h=await r.json();console.log(\"health HTTP\",r.status,\"database\",h.database,\"Gemini configured\",h.geminiConfigured);if(r.status!==200||h.status!==\"ok\")process.exitCode=1}).catch(e=>{console.error(e.message);process.exitCode=1});"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Final Password Git Check Again",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"-e",
+				"const cp=require(\"node:child_process\");for(const a of [[\"status\",\"--short\"],[\"diff\",\"--check\"],[\"check-ignore\",\"--quiet\",\"--\",\".env.local\"]]){const r=cp.spawnSync(\"git\",a,{encoding:\"utf8\"});console.log(\"$ git \"+a.join(\" \"));if(a[0]===\"check-ignore\")console.log(r.status===0?\".env.local ignored\":\".env.local NOT ignored\");else console.log((r.stdout||\"\").trimEnd()||\"(no diff errors)\");if(r.status!==0&&a[0]!==\"status\")process.exitCode=1;}"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}

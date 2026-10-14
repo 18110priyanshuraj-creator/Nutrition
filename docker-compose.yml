@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      DATABASE_PATH: /var/lib/mynutri/mynutri.sqlite
+      TZ: Asia/Kolkata
+    volumes:
+      - mynutri-data:/var/lib/mynutri
+    restart: unless-stopped
+volumes:
+  mynutri-data:

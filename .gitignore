@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.next-agent-check/
+out/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.DS_Store
+*.log
+.agent/
+*.tsbuildinfo
