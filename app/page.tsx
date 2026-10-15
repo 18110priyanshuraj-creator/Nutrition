@@ -90,7 +90,7 @@ export default function Home(){
    const attempt=saveAttemptRef.current;
    sessionStorage.setItem(pendingMealStorageKey,JSON.stringify(attempt));
    const result=await api("/api/meals","POST",{localDate:attempt.localDate,loggedAt:attempt.loggedAt,mealType:attempt.mealType,source:attempt.source,originalText:attempt.original,idempotencyKey:attempt.key,items:attempt.items.map(item=>({...item,portionSource:item.portionSource??(item.portionEstimated?"estimated":"manual")}))});
-   sessionStorage.removeItem(pendingMealStorageKey);saveAttemptRef.current=null;setSavedMealResult(result.meal??null);setMessage("Meal saved from the selected catalog records.");setText("");setLabelProposal(null);setPhoto(null);setPhotoNote("");await refresh();return true;
+   sessionStorage.removeItem(pendingMealStorageKey);saveAttemptRef.current=null;setSavedMealResult(result.meal??null);setMessage("Meal saved successfully.");setText("");setLabelProposal(null);setPhoto(null);setPhotoNote("");await refresh();return true;
   }catch(e){setError(e instanceof Error?e.message:"Could not save meal. Retrying the same entry will reuse its idempotency key.");return false;}finally{setBusy(false);}
  }
  async function saveLabelFood(){if(!labelProposal)return;const name=String(labelProposal.productName||"").trim();if(name.length<2){setError("Edit the product name before saving.");return;}const per100g:Record<string,number>={};for(const item of labelProposal.nutrients||[])if(item.key&&NUTRIENT_BY_KEY[item.key]&&!NUTRIENT_BY_KEY[item.key].qualitative&&typeof item.per100gValue==="number"&&Number.isFinite(item.per100gValue)&&item.per100gValue>=0)per100g[item.key]=item.per100gValue;if(!Object.keys(per100g).length){setError("No convertible nutrient values are available. Enter at least one reviewed per-100 g value.");return;}setBusy(true);setError("");try{await api("/api/foods","POST",{name,aliases:[],preparation:"Packaged product; user-reviewed label; values stored per 100 g",per100g,sourceNote:"User-reviewed nutrition-label transcription from a photo on "+new Date().toISOString()+". Converted to per 100 g where serving mass was known; not independently verified."});setMessage("Reviewed packaged food saved to your private food library.");setLabelProposal(null);setPhoto(null);setPhotoNote("");await refresh();}catch(e){setError(e instanceof Error?e.message:"Could not save packaged food.");}finally{setBusy(false);}}
@@ -122,7 +122,7 @@ export default function Home(){
    const saved=await saveMeal(items,"text",description);
    const omitted=candidates.length-ready.length;
    if(saved&&omitted>0)setMessage("Meal saved in one step. "+omitted+" unrecognized item(s) were not counted, so the totals may be incomplete.");
-   else if(saved&&p.warning)setMessage("Meal saved in one step. "+String(p.warning));
+   else if(saved)setMessage("Meal saved in one step. Portion sizes and nutrition are estimates; check them against what you actually ate.");
   }catch(e){setError(e instanceof Error?e.message:"Meal analysis or save failed.");}
   finally{setBusy(false);}
  }
@@ -167,7 +167,7 @@ export default function Home(){
    if(!ready.length)throw new Error("No catalog-matched foods were found in this photo. Try a clearer image or use manual entry.");
    const items:MealSubmissionItem[]=ready.map(c=>({foodId:String(c.foodId),grams:Number(c.grams),portionEstimated:true,portionSource:"estimated",portionAmount:typeof c.amount==="number"&&c.amount>0?c.amount:undefined,portionUnit:typeof c.unit==="string"?c.unit:undefined,preparation:String(c.preparation||"as pictured"),portionNote:String(c.portionNote||c.notes||"Image-based portion estimate; actual weight may differ.")}));
    const saved=await saveMeal(items,"photo",photoNote||String(p.summary||"Food photo"));
-   if(saved&&ready.length<candidates.length)setMessage("Photo meal saved. Some unrecognized items were omitted from the nutrient totals.");
+   if(saved)setMessage(ready.length<candidates.length?"Photo meal saved. Some unrecognized items were omitted from the nutrient totals. Image portions are estimates.":"Photo meal saved. Image portions are estimates, not measured weights.");
   }catch(e){setError(e instanceof Error?e.message:"Photo analysis failed.");}
   finally{setBusy(false);}
  }
