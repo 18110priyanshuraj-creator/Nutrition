@@ -8,11 +8,11 @@ The starter catalog intentionally contains a small set of provisional generic es
 
 ## Food logging and portion estimates
 
-In **Log Food**, enter a meal in English, Hindi, or Hinglish and choose **Analyze & log meal**. Catalog-matched, sufficiently confident foods are saved directly; unresolved foods remain unlogged and appear in the nearby correction card. A collapsed manual-entry fallback is available when AI is unavailable or when you choose it. The saved card shows the original description, date/category, portion provenance, available nutrient totals, and diary/edit/undo actions.
+In **Log Food**, enter a meal in English, Hindi, or Hinglish and choose **Analyze & log meal**. Safely matched catalog foods with usable portions are saved automatically. Unrecognized foods are omitted, and the save message explains when totals may be incomplete. The manual-entry fallback is available when AI is unavailable or to add a catalog food the model could not match. The saved card shows the original description, date/category, portion provenance, available nutrient totals, and diary/edit/undo actions.
 
 Each submission uses a unique idempotency key: retries return the canonical saved meal instead of adding duplicate records, while logging the same meal intentionally later uses a new key.
 
-Explicit gram quantities are retained as entered. Supported household portions use food-specific estimates rather than a universal piece weight: for example, the almond and edible walnut-kernel estimates cite USDA FoodData Central SR Legacy records 170567 and 170187, respectively. Other household measures (including amla, roti, cooked rice, dal, and milk) are provisional editable estimates; they are not official composition data. Ambiguous or unsupported portions remain unlogged until corrected. AI-proposed nutrients are never used to calculate totals.
+Explicit gram quantities are retained as entered. Supported household portions use food-specific estimates rather than a universal piece weight: for example, the almond and edible walnut-kernel estimates cite USDA FoodData Central SR Legacy records 170567 and 170187, respectively. Other household measures (including amla, roti, cooked rice, dal, and milk) are provisional editable estimates; they are not official composition data. Foods or portions the catalog cannot safely resolve are omitted from that meal's totals; use manual entry to add a catalog food and gram amount. AI-proposed nutrients are never used to calculate totals.
 
 ## Requirements and setup
 
