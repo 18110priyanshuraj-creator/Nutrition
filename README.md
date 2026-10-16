@@ -36,7 +36,7 @@ Set one or more of `GEMINI_API_KEY_1` through `GEMINI_API_KEY_7` and `GEMINI_MOD
 
 ## Persistence and deployment
 
-SQLite suits one personal instance. In production, mount a persistent disk and set DATABASE_PATH to a path on it; ephemeral container filesystems are not durable. Back up using a SQLite-consistent backup method. Do not scale this SQLite deployment horizontally. Before multi-instance hosting, migrate to a managed database and private object storage. The Docker Compose volume persists the database between container restarts. This commit does not deploy a live service.
+SQLite suits one personal instance. In production, mount a persistent disk and set DATABASE_PATH to a path on it; ephemeral container filesystems are not durable. Back up using a SQLite-consistent backup method. Do not scale this SQLite deployment horizontally. Before multi-instance hosting, migrate to a managed database and private object storage. The Docker Compose volume persists the database between container restarts. A successful CI or Vercel preview check does not by itself verify public production behavior or durable database storage.
 
 ## Self-healing repository agent
 
