@@ -34,3 +34,91 @@ jobs:
         run: npm run typecheck
       - name: Production build
         run: npm run build
+      - name: Development server and meal logging smoke test
+        run: |
+          set -euo pipefail
+          export APP_PASSWORD="$(openssl rand -hex 24)"
+          export SESSION_SECRET="$(openssl rand -hex 48)"
+          log="$RUNNER_TEMP/mynutri-next.log"
+          login_page="$RUNNER_TEMP/mynutri-login.html"
+          health_json="$RUNNER_TEMP/mynutri-health.json"
+          cookies="$RUNNER_TEMP/mynutri-cookies.txt"
+          analysis_json="$RUNNER_TEMP/mynutri-analysis.json"
+          meal_payload="$RUNNER_TEMP/mynutri-meal.json"
+          saved_json="$RUNNER_TEMP/mynutri-saved.json"
+          dashboard_json="$RUNNER_TEMP/mynutri-dashboard.json"
+
+          npm run dev -- --port 3000 > "$log" 2>&1 &
+          server_pid=$!
+          cleanup() {
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/login -o "$login_page" 2>/dev/null; then
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat "$log"
+              exit 1
+            fi
+            sleep 2
+          done
+          test -s "$login_page" || { cat "$log"; exit 1; }
+          grep -q "Enter your app password" "$login_page"
+
+          curl -fsS http://127.0.0.1:3000/api/health -o "$health_json"
+          node -e 'const p=require(process.argv[1]); if(p.status!=="ok"||p.timeZone!=="Asia/Kolkata") process.exit(1)' "$health_json"
+
+          printf '{"password":"%s"}' "$APP_PASSWORD" |
+            curl -fsS -c "$cookies" -H 'Content-Type: application/json' --data-binary @- \
+              http://127.0.0.1:3000/api/auth/login > "$RUNNER_TEMP/mynutri-login.json"
+          node -e 'const p=require(process.argv[1]); if(!p.ok) process.exit(1)' "$RUNNER_TEMP/mynutri-login.json"
+
+          printf '{"text":"1 banana"}' |
+            curl -fsS -b "$cookies" -H 'Content-Type: application/json' \
+              http://127.0.0.1:3000/api/analyze --data-binary @- > "$analysis_json"
+          node -e 'const p=require(process.argv[1]); if(!p.candidates?.some(c=>c.foodId==="banana-raw"&&Number.isFinite(c.grams)&&c.grams>0)) process.exit(1)' "$analysis_json"
+
+          node - "$analysis_json" > "$meal_payload" <<'NODE'
+          const fs = require("node:fs");
+          const {randomUUID} = require("node:crypto");
+          const result = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const item = result.candidates.find(candidate =>
+            candidate.foodId === "banana-raw" && Number.isFinite(candidate.grams) && candidate.grams > 0
+          );
+          if (!item) throw new Error("No safely matched banana portion was returned.");
+          const localDate = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit"
+          }).format(new Date());
+          process.stdout.write(JSON.stringify({
+            localDate,
+            loggedAt: new Date().toISOString(),
+            mealType: "Breakfast",
+            source: "text",
+            originalText: "1 banana",
+            idempotencyKey: randomUUID(),
+            items: [{
+              foodId: item.foodId,
+              grams: item.grams,
+              portionEstimated: Boolean(item.portionEstimated),
+              portionAmount: item.amount,
+              portionUnit: item.unit,
+              portionSource: item.portionSource || (item.portionEstimated ? "estimated" : "explicit"),
+              preparation: item.preparation || "as described",
+              portionNote: item.portionNote || ""
+            }]
+          }));
+          NODE
+
+          curl -fsS -b "$cookies" -H 'Content-Type: application/json' \
+            -H 'Origin: http://127.0.0.1:3000' --data-binary @"$meal_payload" \
+            http://127.0.0.1:3000/api/meals > "$saved_json"
+          node -e 'const p=require(process.argv[1]); if(!p.ok||!p.meal?.items?.some(i=>i.foodId==="banana-raw")) process.exit(1)' "$saved_json"
+
+          meal_date="$(node -e 'process.stdout.write(require(process.argv[1]).localDate)' "$meal_payload")"
+          curl -fsS -b "$cookies" \
+            "http://127.0.0.1:3000/api/dashboard?date=$meal_date" -o "$dashboard_json"
+          node -e 'const p=require(process.argv[1]); if(!p.meals?.some(m=>m.items?.some(i=>i.foodId==="banana-raw"))||p.logSummary?.itemCount!==1) process.exit(1)' "$dashboard_json"
