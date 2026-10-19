@@ -143,6 +143,7 @@ describe("food analysis through the shared Gemini keyring", () => {
     ]);
     expect(body.candidates[0].portionNote).toContain("USDA FoodData Central");
     expect(body.warning).toContain("take precedence over model portions");
+    expect(body.warning.toLowerCase()).not.toContain("review");
   });
 
   it("sends validated image bytes to Gemini and returns an editable proposal without saving", async () => {
@@ -161,7 +162,8 @@ describe("food analysis through the shared Gemini keyring", () => {
     expect(response.status).toBe(200);
     expect(body.mode).toBe("gemini");
     expect(body.candidates[0]).toMatchObject({foodId: "banana-raw", foodName: "Banana, raw", confidence: "medium"});
-    expect(body.warning).toContain("Review every food");
+    expect(body.warning).toContain("image-based portions are estimates");
+    expect(body.warning).not.toContain("before saving");
     expect(mocked.generateContent).toHaveBeenCalledTimes(1);
     const parameters = mocked.generateContent.mock.calls[0][0];
     expect(parameters.contents[1].inlineData).toEqual({

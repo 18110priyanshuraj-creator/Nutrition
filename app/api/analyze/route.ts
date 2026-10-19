@@ -131,7 +131,7 @@ export async function POST(request:NextRequest){
   return {foodId:matched?.id??null,foodName:item.foodName,grams,amount,unit,preparation:item.preparation,confidence:item.confidence,portionEstimated,portionSource:portionEstimated?"estimated":"explicit",portionNote,notes:item.notes};
  });
  const warning=imageData
-  ?"AI food recognition and image-based portions are estimates. Review every food and amount before saving."
-  :"AI food recognition and any AI-proposed portions are estimates. Supported quantities stated in your description take precedence over model portions; review uncertain items before saving.";
+  ?"AI food recognition and image-based portions are estimates. Unmatched foods are omitted, so totals may be incomplete."
+  :"AI food recognition and any AI-proposed portions are estimates. Supported quantities stated in your description take precedence over model portions; unmatched foods are omitted, so totals may be incomplete.";
  return NextResponse.json({mode:"gemini",summary:validated.data.summary,warning,candidates});
 }
