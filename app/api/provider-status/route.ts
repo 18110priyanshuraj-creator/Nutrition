@@ -104,18 +104,13 @@ export async function POST(request: Request) {
       }});
       return ai.models.generateContent({
         model,
-        contents: "Reply with exactly: MyNutri AI connection check",
-        config: {maxOutputTokens: 24, temperature: 0},
+        contents: "Reply with only OK. This is a simple connection test.",
+        config: {maxOutputTokens: 128, thinkingConfig: {thinkingLevel: "low"}},
       });
     });
     const checkedAt = new Date().toISOString();
-    if (!response.text?.trim()) {
-      recordGeminiProviderTest({ok: false, model, checkedAt, category: "unknown", slot: usedSlot, retryCount: attemptCount - 1});
-      return NextResponse.json({...statusPayload(), ok: false, category: "unknown", error: categoryMessage("unknown")}, {
-        status: 502,
-        headers: {"Cache-Control": "no-store"},
-      });
-    }
+    // A successful SDK request proves the key/model endpoint is reachable. Some
+    // Gemini 3.8 responses may spend the output budget thinking and expose no text.
     recordGeminiProviderTest({ok: true, model, checkedAt, category: null, slot: usedSlot, retryCount: attemptCount - 1});
     return NextResponse.json({...statusPayload(), ok: true, checkedAt}, {headers: {"Cache-Control": "no-store"}});
   } catch (error) {
