@@ -3,7 +3,7 @@ import {NextRequest} from "next/server";
 import {resetGeminiProviderStateForTests} from "../src/lib/agent/gemini-provider";
 import {POST} from "../app/api/analyze/route";
 
-const mocked = vi.hoisted(() => ({generateContent: vi.fn()}));
+const mocked = vi.hoisted(() => ({generateContent: vi.fn(), dbRun: vi.fn(), dbPrepare: vi.fn()}));
 
 vi.mock("@google/genai", () => ({
   GoogleGenAI: class {
@@ -12,11 +12,15 @@ vi.mock("@google/genai", () => ({
 }));
 
 vi.mock("@/lib/server-auth", () => ({requireOwner: async () => null}));
+vi.mock("@/lib/db", () => ({
+  getDb: () => ({prepare: (sql: string) => {mocked.dbPrepare(sql); return {run: mocked.dbRun};}}),
+}));
 vi.mock("@/lib/server-data", () => ({
   foodList: () => [
     {id: "banana-raw", name: "Banana, raw", aliases: ["banana"], nutrients: {kcal: 89}},
     {id: "almonds", name: "Almonds", aliases: ["almonds", "badam", "बादाम"], nutrients: {kcal: 579}},
-    {id: "moringa", name: "Moringa leaves, dry powder", aliases: ["moringa dry powder"], nutrients: {}},
+    {id: "moringa", name: "Moringa leaves, dry powder", aliases: ["moringa dry powder"], nutrients: {}, preparation: "dry powder", source: "starter", confidence: "estimate"},
+    {id: "sattu-roasted-gram-flour", name: "Sattu (roasted gram flour)", aliases: ["sattu", "sattu powder", "सत्तू"], nutrients: {kcal: 387, protein_g: 22.4, carbs_g: 58.3, fat_g: 6.7}, preparation: "dry flour", source: "starter", confidence: "estimate"},
   ],
 }));
 
@@ -41,6 +45,8 @@ beforeEach(() => {
     delete process.env[name];
   }
   mocked.generateContent.mockReset();
+  mocked.dbRun.mockReset();
+  mocked.dbPrepare.mockReset();
   resetGeminiProviderStateForTests();
 });
 
@@ -81,6 +87,14 @@ describe("food analysis without Gemini credentials", () => {
     expect(unavailable.status).toBe(503);
     expect((await unavailable.json()).error).toContain("Gemini is not configured");
     expect(mocked.generateContent).not.toHaveBeenCalled();
+
+    const sattu = await POST(request("Sattu"));
+    const sattuBody = await sattu.json();
+    expect(sattu.status).toBe(200);
+    expect(sattuBody.mode).toBe("local_match");
+    expect(sattuBody.candidates).toMatchObject([
+      {foodId: "sattu-roasted-gram-flour", foodName: "Sattu (roasted gram flour)", grams: 30, portionEstimated: true, portionSource: "estimated"},
+    ]);
   });
 });
 
@@ -118,6 +132,33 @@ describe("food analysis through the shared Gemini keyring", () => {
     expect(body.error).toContain("timed out or failed temporarily");
     expect(JSON.stringify(body)).not.toContain("private-photo-test-key");
     expect(JSON.stringify(body)).not.toContain("fetch failed");
+  });
+
+  it("creates a provisional catalog record for a recognized food missing from the catalog", async () => {
+    process.env.GEMINI_API_KEY_1 = "private-photo-test-key";
+    process.env.GEMINI_MODEL = "gemini-3.8-flash";
+    mocked.generateContent.mockResolvedValue({
+      text: JSON.stringify({
+        items: [{
+          foodName: "Poha", amount: 180, unit: "g", preparation: "cooked poha; oil quantity unknown",
+          confidence: "medium", notes: "Typical home-cooked estimate",
+          nutrientsPer100g: {kcal: 130, protein_g: 3.2, carbs_g: 26, fat_g: 2.5},
+        }],
+        summary: "One estimated serving of poha",
+      }),
+    });
+
+    const response = await POST(request("Poha"));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.candidates[0]).toMatchObject({
+      foodName: "Poha", grams: 180, portionEstimated: true, portionSource: "estimated",
+    });
+    expect(typeof body.candidates[0].foodId).toBe("string");
+    expect(body.warning).toContain("provisional AI-estimated records");
+    expect(mocked.dbPrepare.mock.calls[0][0]).toContain("INSERT OR IGNORE INTO foods");
+    const storedNutrients = JSON.parse(mocked.dbRun.mock.calls[0][4] as string);
+    expect(storedNutrients).toMatchObject({kcal: 130, protein_g: 3.2, carbs_g: 26, fat_g: 2.5});
   });
 
   it("uses supported text portions instead of implausible model weights", async () => {
