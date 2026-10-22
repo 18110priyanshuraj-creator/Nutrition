@@ -77,30 +77,23 @@ function imageRequest(): NextRequest {
 }
 
 describe("food analysis without Gemini credentials", () => {
-  it("uses local catalog matching when possible and clearly reports when unavailable", async () => {
-    const localMatch = await POST(request("banana"));
-    const localBody = await localMatch.json();
-    expect(localMatch.status).toBe(200);
-    expect(localBody.mode).toBe("local_match");
-    expect(localBody.summary).toContain("not a Gemini analysis");
+  it("does not bypass Gemini with local matches when no key is configured", async () => {
+    const knownFood = await POST(request("banana"));
+    const knownBody = await knownFood.json();
+    expect(knownFood.status).toBe(503);
+    expect(knownBody.category).toBe("missing_key");
+    expect(knownBody.error).toContain("Gemini is not configured");
+    expect(knownBody.candidates).toBeUndefined();
 
-    const unavailable = await POST(request("an unfamiliar food phrase"));
-    expect(unavailable.status).toBe(503);
-    expect((await unavailable.json()).error).toContain("Gemini is not configured");
+    const unknownFood = await POST(request("an unfamiliar food phrase"));
+    expect(unknownFood.status).toBe(503);
+    expect((await unknownFood.json()).error).toContain("Gemini is not configured");
     expect(mocked.generateContent).not.toHaveBeenCalled();
-
-    const sattu = await POST(request("Sattu"));
-    const sattuBody = await sattu.json();
-    expect(sattu.status).toBe(200);
-    expect(sattuBody.mode).toBe("local_match");
-    expect(sattuBody.candidates).toMatchObject([
-      {foodId: "sattu-roasted-gram-flour", foodName: "Sattu (roasted gram flour)", grams: 30, portionEstimated: true, portionSource: "estimated"},
-    ]);
   });
 });
 
 describe("food analysis through the shared Gemini keyring", () => {
-  it("automatically falls back to supported local text matches when Gemini is unavailable", async () => {
+  it("does not bypass Gemini with local matches when the provider is unavailable", async () => {
     process.env.GEMINI_API_KEY_1 = "private-photo-test-key";
     process.env.GEMINI_MODEL = "gemini-3.5-flash-lite";
     mocked.generateContent.mockRejectedValue(new Error("fetch failed"));
@@ -108,18 +101,17 @@ describe("food analysis through the shared Gemini keyring", () => {
     const response = await POST(request("6 badam"));
     const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.mode).toBe("local_match");
-    expect(body.warning).toContain("Gemini analysis failed (network)");
-    expect(body.warning).toContain("Only local catalog matches were used");
-    expect(body.candidates).toMatchObject([
-      {foodId: "almonds", grams: 7.2, portionEstimated: true, portionSource: "estimated"},
-    ]);
+    expect(response.status).toBe(504);
+    expect(body.category).toBe("network");
+    expect(body.mode).toBeUndefined();
+    expect(body.candidates).toBeUndefined();
+    expect(body.manualEntryAvailable).toBeUndefined();
+    expect(body.error).toContain("temporarily");
     expect(JSON.stringify(body)).not.toContain("private-photo-test-key");
     expect(JSON.stringify(body)).not.toContain("fetch failed");
   });
 
-  it("keeps provider errors explicit when no safe local match is available", async () => {
+  it("returns a provider error for unfamiliar foods instead of opening a fallback entry flow", async () => {
     process.env.GEMINI_API_KEY_1 = "private-photo-test-key";
     process.env.GEMINI_MODEL = "gemini-3.5-flash-lite";
     mocked.generateContent.mockRejectedValue(new Error("fetch failed"));
@@ -129,7 +121,7 @@ describe("food analysis through the shared Gemini keyring", () => {
 
     expect(response.status).toBe(504);
     expect(body.category).toBe("network");
-    expect(body.manualEntryAvailable).toBe(true);
+    expect(body.manualEntryAvailable).toBeUndefined();
     expect(body.error).toContain("timed out or failed temporarily");
     expect(JSON.stringify(body)).not.toContain("private-photo-test-key");
     expect(JSON.stringify(body)).not.toContain("fetch failed");
