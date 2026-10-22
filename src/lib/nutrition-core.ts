@@ -218,7 +218,7 @@ export function parseKnownFoods(text: string, foods: FoodLike[]): ParsedCandidat
         foodId: food.id,
         name: food.name,
         grams: converted?.grams ?? null,
-        amount: quantity?.amount ?? null,
+        amount: quantity?.amount ?? (converted ? 1 : null),
         unit: quantity?.unit || (unit || null),
         estimated: converted?.estimated ?? true,
         confidence: "medium",
