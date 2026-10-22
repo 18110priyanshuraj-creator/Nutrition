@@ -42,7 +42,7 @@ export default function Home(){
  const [text,setText]=useState(""),[mealType,setMealType]=useState("Breakfast");
  const [savedMealResult,setSavedMealResult]=useState<Row|null>(null);
  const [photo,setPhoto]=useState<File|null>(null),[photoPreview,setPhotoPreview]=useState(""),[photoNote,setPhotoNote]=useState(""),[photoMode,setPhotoMode]=useState<"food"|"label">("food");
- const [search,setSearch]=useState(""),[foodId,setFoodId]=useState(""),[grams,setGrams]=useState("100"),[edits,setEdits]=useState<Record<string,string>>({}),[editFoodIds,setEditFoodIds]=useState<Record<string,string>>({});
+ const [search,setSearch]=useState(""),[edits,setEdits]=useState<Record<string,string>>({}),[editFoodIds,setEditFoodIds]=useState<Record<string,string>>({});
  const [kind,setKind]=useState("weight"),[measureValue,setMeasureValue]=useState(""),[measureNote,setMeasureNote]=useState("");
  const [profile,setProfile]=useState<Row>({}),[targetInputs,setTargetInputs]=useState<Record<string,string>>({}),[provider,setProvider]=useState<Row|null>(null),[restoreFile,setRestoreFile]=useState<File|null>(null);
  const [recipeName,setRecipeName]=useState(""),[recipeDescription,setRecipeDescription]=useState(""),[recipeServings,setRecipeServings]=useState("2"),[recipeFoodId,setRecipeFoodId]=useState(""),[recipeGrams,setRecipeGrams]=useState("100"),[recipeIngredients,setRecipeIngredients]=useState<Array<{foodId:string;grams:number}>>([]),[editingRecipeId,setEditingRecipeId]=useState<string|null>(null);
