@@ -63,7 +63,7 @@ export type PortionConversion = {
 const unitAliases: Record<string, string> = {
   gram: "g", grams: "g", gm: "g", kilogram: "kg", kilograms: "kg",
   milliliter: "ml", milliliters: "ml", millilitre: "ml", millilitres: "ml",
-  piece: "piece", pieces: "piece", pc: "piece", pcs: "piece", half: "half", halves: "half",
+  piece: "piece", pieces: "piece", pc: "piece", pcs: "piece", half: "half", halves: "half", serving: "serving", servings: "serving",
   banana: "piece", bananas: "piece", egg: "piece", eggs: "piece",
   chapati: "roti", chapathis: "roti", rotis: "roti",
   bowlful: "bowl", bowls: "bowl", cups: "cup", glasses: "glass",
@@ -72,6 +72,7 @@ const unitAliases: Record<string, string> = {
 
 function foodKind(foodName: string): string {
   const name = foodName.toLocaleLowerCase().normalize("NFKC");
+  if (/sattu|roasted gram flour|bhuna chana|सत्तू/.test(name)) return "sattu-powder";
   if (/almond|badam|बादाम/.test(name)) return "almond";
   if (/walnut|akhrot|अखरोट/.test(name)) return "walnut";
   if (/amla|gooseberry|आंवला/.test(name)) return "amla";
@@ -87,6 +88,7 @@ function foodKind(foodName: string): string {
 
 function householdGrams(kind: string, unit: string): number | null {
   const portions: Record<string, Record<string, number>> = {
+    "sattu-powder": {serving: 30, tsp: 2.7, tbsp: 8, cup: 90},
     almond: {piece: 1.2, tbsp: 9, cup: 143},
     walnut: {piece: 4, half: 2, tbsp: 7.5, cup: 117},
     amla: {piece: 35},
@@ -104,6 +106,7 @@ function householdGrams(kind: string, unit: string): number | null {
 const portionEstimateNotes: Record<string, string> = {
   almond: "Approximate kernel weight based on USDA FoodData Central SR Legacy record 170567 (1 almond = 1.2 g); nutrient values in this catalog record remain provisional.",
   walnut: "Approximate edible-kernel weight based on USDA FoodData Central SR Legacy record 170187 (28 g edible yield for 7 nuts; 28.35 g for 14 halves); shells excluded.",
+  "sattu-powder": "Approximate 30 g starter serving of dry sattu flour; estimate only and not a verified nutrient database record.",
 };
 
 export function unitToGrams(amount: number, unit: string, foodName = ""): PortionConversion {
@@ -187,9 +190,11 @@ export function parseKnownFoods(text: string, foods: FoodLike[]): ParsedCandidat
       const before = portionBefore(normalized.slice(0, match.index));
       const after = portionAfter(normalized.slice(match.index + match[0].length));
       const quantity = after ?? before;
-      const isCountFood = Boolean(foodKind(food.name) && householdGrams(foodKind(food.name), "piece") !== null);
+      const kind = foodKind(food.name);
+      const isCountFood = Boolean(kind && householdGrams(kind, "piece") !== null);
+      const defaultUnit = isCountFood ? "piece" : householdGrams(kind, "serving") !== null ? "serving" : "";
       const amount = quantity?.amount ?? 1;
-      const unit = quantity?.unit || (isCountFood ? "piece" : "");
+      const unit = quantity?.unit || defaultUnit;
       const itemContext = normalized.slice(Math.max(0, match.index - 24), match.index + match[0].length + 24);
       let converted: PortionConversion | null = null;
       let note = "";
@@ -203,7 +208,7 @@ export function parseKnownFoods(text: string, foods: FoodLike[]): ParsedCandidat
         note = error instanceof Error ? error.message : "Portion needs clarification.";
       }
       if (converted && !quantity) {
-        note = "Quantity was not stated; one food-specific piece estimate was used. " + converted.note;
+        note = "Quantity was not stated; one food-specific " + (unit === "piece" ? "piece" : "serving") + " estimate was used. " + converted.note;
       } else if (converted && quantity && !quantity.unit) {
         note = "The count was interpreted using a food-specific piece estimate. " + converted.note;
       } else if (converted) {
