@@ -95,7 +95,7 @@ export async function POST(request: Request) {
   let usedSlot: string | null = null;
   let attemptCount = 0;
   try {
-    const response = await withGeminiKeyFailover(async (apiKey, slot) => {
+    await withGeminiKeyFailover(async (apiKey, slot) => {
       attemptCount += 1;
       usedSlot = slot;
       const ai = new GoogleGenAI({apiKey, httpOptions: {
