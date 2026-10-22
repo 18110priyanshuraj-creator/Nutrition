@@ -211,7 +211,7 @@ export async function POST(request:NextRequest){
   const contents=imageData?[prompt,{inlineData:{mimeType:imageData.mimeType,data:imageData.data}}]:prompt;
   const response=await withGeminiKeyFailover(async(apiKey)=>{
    const ai=new GoogleGenAI({apiKey,httpOptions:{timeout:geminiRequestTimeoutMs(),retryOptions:{attempts:1}}});
-   return ai.models.generateContent({model,contents,config:{maxOutputTokens:2600,responseMimeType:"application/json",responseJsonSchema:responseJsonSchema as never}});
+   return ai.models.generateContent({model,contents,config:{maxOutputTokens:8192,thinkingConfig:{thinkingLevel:"low"},responseMimeType:"application/json",responseJsonSchema:responseJsonSchema as never}});
   });
   resultText=response.text||"";
  }catch(error){
