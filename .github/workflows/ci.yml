@@ -35,6 +35,16 @@ jobs:
       - name: Production build
         run: npm run build
       - name: Development server and meal logging smoke test
+        env:
+          GEMINI_API_KEY_1: ${{ secrets.GEMINI_API_KEY_1 }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+          GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
+          GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
+          GEMINI_API_KEY_5: ${{ secrets.GEMINI_API_KEY_5 }}
+          GEMINI_API_KEY_6: ${{ secrets.GEMINI_API_KEY_6 }}
+          GEMINI_API_KEY_7: ${{ secrets.GEMINI_API_KEY_7 }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.8-flash
         run: |
           set -euo pipefail
           export APP_PASSWORD="$(openssl rand -hex 24)"
@@ -77,41 +87,40 @@ jobs:
               http://127.0.0.1:3000/api/auth/login > "$RUNNER_TEMP/mynutri-login.json"
           node -e 'const p=require(process.argv[1]); if(!p.ok) process.exit(1)' "$RUNNER_TEMP/mynutri-login.json"
 
-          printf '{"text":"1 banana"}' |
-            curl -fsS -b "$cookies" -H 'Content-Type: application/json' \
-              http://127.0.0.1:3000/api/analyze --data-binary @- > "$analysis_json"
-          node -e 'const p=require(process.argv[1]); if(!p.candidates?.some(c=>c.foodId==="banana-raw"&&Number.isFinite(c.grams)&&c.grams>0)) process.exit(1)' "$analysis_json"
-
-          node - "$analysis_json" > "$meal_payload" <<'NODE'
+          configured_keys="${GEMINI_API_KEY_1:-}${GEMINI_API_KEY_2:-}${GEMINI_API_KEY_3:-}${GEMINI_API_KEY_4:-}${GEMINI_API_KEY_5:-}${GEMINI_API_KEY_6:-}${GEMINI_API_KEY_7:-}${GEMINI_API_KEY:-}"
+          if [[ -n "$configured_keys" ]]; then
+            printf '{"text":"1 banana"}' | curl -fsS -b "$cookies" -H 'Content-Type: application/json' http://127.0.0.1:3000/api/analyze --data-binary @- > "$analysis_json"
+            node -e 'const p=require(process.argv[1]); if(!p.candidates?.some(c=>c.foodId==="banana-raw"&&Number.isFinite(c.grams)&&c.grams>0)) process.exit(1)' "$analysis_json"
+            node - "$analysis_json" > "$meal_payload" <<'NODE'
           const fs = require("node:fs");
           const {randomUUID} = require("node:crypto");
           const result = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-          const item = result.candidates.find(candidate =>
-            candidate.foodId === "banana-raw" && Number.isFinite(candidate.grams) && candidate.grams > 0
-          );
-          if (!item) throw new Error("No safely matched banana portion was returned.");
-          const localDate = new Intl.DateTimeFormat("en-CA", {
-            timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit"
-          }).format(new Date());
+          const item = result.candidates.find(candidate => candidate.foodId === "banana-raw" && Number.isFinite(candidate.grams) && candidate.grams > 0);
+          if (!item) throw new Error("Gemini did not return a usable banana portion.");
+          const localDate = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
           process.stdout.write(JSON.stringify({
-            localDate,
-            loggedAt: new Date().toISOString(),
-            mealType: "Breakfast",
-            source: "text",
-            originalText: "1 banana",
-            idempotencyKey: randomUUID(),
-            items: [{
-              foodId: item.foodId,
-              grams: item.grams,
-              portionEstimated: Boolean(item.portionEstimated),
-              portionAmount: item.amount,
-              portionUnit: item.unit,
-              portionSource: item.portionSource || (item.portionEstimated ? "estimated" : "explicit"),
-              preparation: item.preparation || "as described",
-              portionNote: item.portionNote || ""
-            }]
+            localDate,loggedAt:new Date().toISOString(),mealType:"Breakfast",source:"text",originalText:"1 banana",
+            idempotencyKey:randomUUID(),
+            items:[{foodId:item.foodId,grams:item.grams,portionEstimated:Boolean(item.portionEstimated),portionAmount:item.amount,
+              portionUnit:item.unit,portionSource:item.portionSource||(item.portionEstimated?"estimated":"explicit"),
+              preparation:item.preparation||"as described",portionNote:item.portionNote||""}]
           }));
           NODE
+          else
+            analysis_status="$(printf '{"text":"1 banana"}' | curl -sS -o "$analysis_json" -w '%{http_code}' -b "$cookies" -H 'Content-Type: application/json' http://127.0.0.1:3000/api/analyze --data-binary @-)"
+            test "$analysis_status" = "503"
+            node -e 'const p=require(process.argv[1]); if(p.category!=="missing_key"||p.candidates!==undefined||!String(p.error||"").includes("Gemini is not configured")) process.exit(1)' "$analysis_json"
+            node - "$meal_payload" <<'NODE'
+          const {randomUUID} = require("node:crypto");
+          const localDate = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+          process.stdout.write(JSON.stringify({
+            localDate,loggedAt:new Date().toISOString(),mealType:"Breakfast",source:"text",
+            originalText:"CI database smoke test",idempotencyKey:randomUUID(),
+            items:[{foodId:"banana-raw",grams:118,portionEstimated:true,portionAmount:1,portionUnit:"piece",
+              portionSource:"estimated",preparation:"raw",portionNote:"CI fixture only; not a Gemini result"}]
+          }));
+          NODE
+          fi
 
           curl -fsS -b "$cookies" -H 'Content-Type: application/json' \
             -H 'Origin: http://127.0.0.1:3000' --data-binary @"$meal_payload" \
