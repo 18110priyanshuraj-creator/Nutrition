@@ -9,6 +9,7 @@ const mocked = vi.hoisted(() => ({
 }));
 
 vi.mock("@google/genai", () => ({
+  ThinkingLevel: {LOW: "LOW"},
   GoogleGenAI: class {
     models = {generateContent: mocked.generateContent};
     constructor(options: {apiKey: string}) {
