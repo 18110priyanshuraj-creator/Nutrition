@@ -245,7 +245,7 @@ describe("food analysis through the shared Gemini keyring", () => {
 
     expect(response.status).toBe(504);
     expect(body.category).toBe("network");
-    expect(body.manualEntryAvailable).toBe(true);
+    expect(body.manualEntryAvailable).toBeUndefined();
     expect(body.candidates).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain("private-photo-test-key");
     expect(JSON.stringify(body)).not.toContain("fetch failed");
