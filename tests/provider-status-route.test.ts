@@ -89,6 +89,9 @@ describe("Gemini provider status endpoint", () => {
     const refreshed = await GET(new Request("http://localhost/api/provider-status"));
     expect((await refreshed.json()).health).toBe("healthy");
     expect(mocked.generateContent).toHaveBeenCalledTimes(2);
+    const requestConfig = mocked.generateContent.mock.calls[0][0].config;
+    expect(requestConfig).toMatchObject({maxOutputTokens: 128, thinkingConfig: {thinkingLevel: "low"}});
+    expect(requestConfig).not.toHaveProperty("temperature");
   });
 
   it("keeps configured keys unhealthy after a provider network failure", async () => {
