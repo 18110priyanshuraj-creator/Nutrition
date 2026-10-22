@@ -116,22 +116,36 @@ export async function POST(request:NextRequest){
  try{parsedJson=JSON.parse(resultText);}catch{return NextResponse.json({error:"Gemini returned an invalid structured response. Nothing was saved."},{status:502});}
  const validated=proposalSchema.safeParse(parsedJson);
  if(!validated.success)return NextResponse.json({error:"Gemini's proposal did not pass validation. Nothing was saved."},{status:502});
- const statedPortions=imageData?[]:parseKnownFoods(text,catalog);
  const candidates=validated.data.items.map((item)=>{
-  const normalized=item.foodName.trim().toLocaleLowerCase().normalize("NFKC");
-  const matched=catalog.find((food)=>food.name.trim().toLocaleLowerCase().normalize("NFKC")===normalized||(food.aliases||[]).some((alias)=>alias.trim().toLocaleLowerCase().normalize("NFKC")===normalized));
-  const statedPortion=matched?statedPortions.find(candidate=>candidate.foodId===matched.id):undefined;
-  let grams:number|null=null;let amount:number|null=item.amount;let unit:string|null=item.unit;let portionEstimated=true;let portionNote="";
+  let matched=findCatalogFood(item.foodName,catalog);
+  if(!matched&&item.nutrientsPer100g){
+   const created=createAiEstimatedFood(item.foodName,item.preparation,item.nutrientsPer100g);
+   if(created){
+    const existing=catalog.find(food=>food.id===created.id);
+    matched=existing??created;
+    if(!existing)catalog.push(created);
+   }
+  }
+  const statedPortion=matched&&!imageData
+   ?parseKnownFoods(text,catalog).find(candidate=>candidate.foodId===matched!.id&&typeof candidate.grams==="number")
+   :undefined;
+  let grams:number|null=null;
+  let amount:number|null=item.amount;
+  let unit:string|null=item.unit;
+  let portionEstimated=true;
+  let portionNote="";
   if(statedPortion){
    grams=statedPortion.grams;amount=statedPortion.amount;unit=statedPortion.unit;
    portionEstimated=statedPortion.estimated;portionNote=statedPortion.note;
   }else{
-   try{const conversion=unitToGrams(item.amount,item.unit,matched?.name||item.foodName);grams=conversion.grams;portionNote=conversion.note;}catch(error){portionNote=error instanceof Error?error.message:"Portion needs clarification.";}
+   const conversion=proposedGrams(item.amount,item.unit,matched?.name||item.foodName);
+   grams=conversion.grams;portionNote=conversion.note;
+   if(!imageData)portionNote="AI-estimated serving or portion; approximate, not a measured weight. "+portionNote;
   }
-  return {foodId:matched?.id??null,foodName:item.foodName,grams,amount,unit,preparation:item.preparation,confidence:item.confidence,portionEstimated,portionSource:portionEstimated?"estimated":"explicit",portionNote,notes:item.notes};
+  return {foodId:matched?.id??null,foodName:matched?.name??item.foodName,grams,amount,unit,preparation:item.preparation,confidence:item.confidence,portionEstimated,portionSource:portionEstimated?"estimated":"explicit",portionNote,notes:item.notes};
  });
  const warning=imageData
-  ?"AI food recognition and image-based portions are estimates. Unmatched foods are omitted, so totals may be incomplete."
-  :"AI food recognition and any AI-proposed portions are estimates. Supported quantities stated in your description take precedence over model portions; unmatched foods are omitted, so totals may be incomplete.";
+  ?"Food recognition, visible portions, and any newly added nutrition records are provisional AI estimates. Nutrients not returned by the model remain unknown; image weights are not measured."
+  :"Food recognition and AI-proposed portions are estimates. Supported quantities stated in your description take precedence. Foods outside the catalog are saved as provisional AI-estimated records; unreturned nutrients remain unknown.";
  return NextResponse.json({mode:"gemini",summary:validated.data.summary,warning,candidates});
 }
