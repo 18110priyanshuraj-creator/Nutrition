@@ -6,6 +6,7 @@ import {POST} from "../app/api/analyze/route";
 const mocked = vi.hoisted(() => ({generateContent: vi.fn(), dbRun: vi.fn(), dbPrepare: vi.fn()}));
 
 vi.mock("@google/genai", () => ({
+  ThinkingLevel: {LOW: "LOW"},
   GoogleGenAI: class {
     models = {generateContent: mocked.generateContent};
   },
