@@ -54,7 +54,7 @@ export async function POST(request:NextRequest){
  try{
   const response=await withGeminiKeyFailover(async(apiKey)=>{
    const ai=new GoogleGenAI({apiKey,httpOptions:{timeout:geminiRequestTimeoutMs(),retryOptions:{attempts:1}}});
-   return ai.models.generateContent({model,contents:[{text:prompt},{inlineData:{mimeType,data:Buffer.from(bytes).toString("base64")}}],config:{temperature:0,maxOutputTokens:2400,responseMimeType:"application/json",responseJsonSchema:jsonSchema as never}});
+   return ai.models.generateContent({model,contents:[{text:prompt},{inlineData:{mimeType,data:Buffer.from(bytes).toString("base64")}}],config:{maxOutputTokens:6144,thinkingConfig:{thinkingLevel:"low"},responseMimeType:"application/json",responseJsonSchema:jsonSchema as never}});
   });
   if(!response.text)return NextResponse.json({error:"Gemini returned no label text. Nothing was saved."},{status:502});
   let raw:unknown;try{raw=JSON.parse(response.text);}catch{return NextResponse.json({error:"Gemini returned malformed label data. Nothing was saved."},{status:502});}
