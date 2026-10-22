@@ -52,6 +52,16 @@ describe("Gemini key failover", () => {
     expect(status.activeSlot).toBe("Slot 2");
     expect(JSON.stringify(status)).not.toContain("private-one");
   });
+  it("tries the next configured key when one key is invalid", async () => {
+    const tried: string[] = [];
+    const result = await withGeminiKeyFailover(async (key) => {
+      tried.push(key);
+      if (key === "private-one") throw {status: 401, message: "API key invalid"};
+      return "ok";
+    }, {keys, cooldownMs: 1000, now: () => 1800000000000, maxAttempts: 4});
+    expect(result).toBe("ok");
+    expect(tried).toEqual(["private-one", "private-two"]);
+  });
   it("stops at model configuration failures instead of cycling keys", async () => {
     const tried: string[] = [];
     await expect(withGeminiKeyFailover(async (_key, slot) => { tried.push(slot); throw {status: 404, message: "model not found"}; }, {keys, cooldownMs: 1000, now: () => 1800000000000})).rejects.toMatchObject({category: "model_not_found"});

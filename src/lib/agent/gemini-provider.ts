@@ -210,7 +210,8 @@ export async function withGeminiKeyFailover<T>(
       lastRetryAfter = slotCooldown;
       if (
         attemptedSlots.length < candidates.length
-        && (category === "rate_limit" || category === "timeout" || category === "network")
+        && (category === "rate_limit" || category === "timeout" || category === "network"
+          || category === "invalid_key" || category === "permission" || category === "unknown")
       ) {
         await sleep(Math.min(2000, 250 * 2 ** (attemptedSlots.length - 1)));
       }

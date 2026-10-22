@@ -1,4 +1,4 @@
-import {GoogleGenAI} from "@google/genai";
+import {GoogleGenAI, ThinkingLevel} from "@google/genai";
 import {NextResponse} from "next/server";
 import {
   classifyGeminiError,
@@ -105,7 +105,7 @@ export async function POST(request: Request) {
       return ai.models.generateContent({
         model,
         contents: "Reply with only OK. This is a simple connection test.",
-        config: {maxOutputTokens: 128, thinkingConfig: {thinkingLevel: "low"}},
+        config: {maxOutputTokens: 128, thinkingConfig: {thinkingLevel: ThinkingLevel.LOW}},
       });
     });
     const checkedAt = new Date().toISOString();
