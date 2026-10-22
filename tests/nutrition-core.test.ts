@@ -11,6 +11,7 @@ const foods = [
   {id: "roti", name: "Whole-wheat roti", aliases: ["roti"], nutrients: {kcal: 297}},
   {id: "dal", name: "Dal, cooked", aliases: ["dal"], nutrients: {kcal: 116}},
   {id: "milk", name: "Cow milk, toned", aliases: ["milk"], nutrients: {kcal: 61}},
+  {id: "sattu", name: "Sattu (roasted gram flour)", aliases: ["sattu", "सत्तू"], nutrients: {kcal: 387}},
 ];
 
 describe("nutrition core", () => {
@@ -43,6 +44,11 @@ describe("nutrition core", () => {
       .toMatchObject({grams: 6, amount: 3, unit: "half"});
     expect(parseKnownFoods("1 whole walnut", foods).find(item => item.foodId === "walnuts"))
       .toMatchObject({grams: null, estimated: true});
+  });
+
+  it("estimates a 30 g dry-sattu serving when the user only types Sattu", () => {
+    expect(parseKnownFoods("Sattu", foods).find(item => item.foodId === "sattu"))
+      .toMatchObject({grams: 30, amount: 1, unit: "serving", estimated: true});
   });
 
   it("preserves an explicit dry-powder gram quantity exactly", () => {
