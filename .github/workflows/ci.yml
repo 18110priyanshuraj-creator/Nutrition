@@ -110,7 +110,7 @@ jobs:
             analysis_status="$(printf '{"text":"1 banana"}' | curl -sS -o "$analysis_json" -w '%{http_code}' -b "$cookies" -H 'Content-Type: application/json' http://127.0.0.1:3000/api/analyze --data-binary @-)"
             test "$analysis_status" = "503"
             node -e 'const p=require(process.argv[1]); if(p.category!=="missing_key"||p.candidates!==undefined||!String(p.error||"").includes("Gemini is not configured")) process.exit(1)' "$analysis_json"
-            node - "$meal_payload" <<'NODE'
+            node - > "$meal_payload" <<'NODE'
           const {randomUUID} = require("node:crypto");
           const localDate = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
           process.stdout.write(JSON.stringify({
