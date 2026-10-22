@@ -255,7 +255,7 @@ export async function POST(request:NextRequest){
   return {foodId:matched?.id??null,foodName:matched?.name??item.foodName,grams,amount,unit,preparation:item.preparation,confidence:item.confidence,portionEstimated,portionSource:portionEstimated?"estimated":"explicit",portionNote,notes:item.notes};
  });
  const warning=imageData
-  ?"Food recognition and any newly added nutrition records are provisional AI estimates. Image-based portions are estimates, and image weights are not measured. Nutrients not returned by the model remain unknown."
+  ?"Food recognition and any newly added nutrition records are provisional AI estimates. image-based portions are estimates, and image weights are not measured. Nutrients not returned by the model remain unknown."
   :"Food recognition and AI-proposed portions are estimates. Supported quantities stated in your description take precedence over model portions. Foods outside the catalog are saved as provisional AI-estimated records; unreturned nutrients remain unknown.";
  return NextResponse.json({mode:"gemini",summary:validated.data.summary,warning,candidates});
 }
