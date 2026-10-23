@@ -61,6 +61,20 @@ describe("same-origin request validation", () => {
     }))).toBe(true);
   });
 
+  it("accepts a Render HTTPS origin when TLS terminates before the internal HTTP handler", () => {
+    const publicHost = "mynutri-ai-nutrition-tracker.onrender.com";
+    const proxied = new Request(`http://localhost:10000/api/meals`, {
+      method: "POST",
+      headers: {
+        host: publicHost,
+        origin: `https://${publicHost}`,
+        "x-forwarded-host": publicHost,
+        "x-forwarded-proto": "https",
+      },
+    });
+    expect(isSameOriginRequest(proxied)).toBe(true);
+  });
+
   it("accepts a same-origin local development request", () => {
     expect(isSameOriginRequest(request("http://localhost:3000"))).toBe(true);
   });

@@ -76,10 +76,19 @@ export function isSameOriginRequest(request: Request): boolean {
   const sameInternalTarget = requestAuthority.host.toLowerCase() === requestUrl.host.toLowerCase() ||
     (isLoopback(requestAuthority.hostname) && isLoopback(requestUrl.hostname));
 
+  // Render terminates HTTPS at its proxy, so the app can receive an internal
+  // HTTP request URL even though the browser's Origin is HTTPS. Use the trusted
+  // forwarded protocol when it is present, while still requiring the Origin host
+  // to match the actual Host header received by this service.
+  const normalizedForwardedProtocol = forwardedProtocol?.toLowerCase() ?? null;
+  const forwardedProtocolMatchesOrigin =
+    normalizedForwardedProtocol !== null &&
+    ["http", "https"].includes(normalizedForwardedProtocol) &&
+    origin.protocol === `${normalizedForwardedProtocol}:`;
+
   if (
-    sameInternalTarget &&
     origin.host.toLowerCase() === requestAuthority.host.toLowerCase() &&
-    origin.protocol === requestUrl.protocol
+    (origin.protocol === requestUrl.protocol || forwardedProtocolMatchesOrigin)
   ) {
     return true;
   }
