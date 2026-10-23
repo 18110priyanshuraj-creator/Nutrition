@@ -76,6 +76,22 @@ export function isSameOriginRequest(request: Request): boolean {
   const sameInternalTarget = requestAuthority.host.toLowerCase() === requestUrl.host.toLowerCase() ||
     (isLoopback(requestAuthority.hostname) && isLoopback(requestUrl.hostname));
 
+  // Render publishes the canonical public hostname as a runtime environment
+  // variable. The request URL/Host can be internal HTTP behind its TLS proxy.
+  // Only trust an HTTPS Origin matching this service's own configured hostname.
+  const renderHost = process.env.RENDER?.toLowerCase() === "true"
+    ? process.env.RENDER_EXTERNAL_HOSTNAME?.trim().toLowerCase()
+    : undefined;
+  if (
+    renderHost &&
+    origin.protocol === "https:" &&
+    origin.host.toLowerCase() === renderHost &&
+    /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(renderHost) &&
+    !renderHost.includes("..")
+  ) {
+    return true;
+  }
+
   // Render terminates HTTPS at its proxy, so the app can receive an internal
   // HTTP request URL even though the browser's Origin is HTTPS. Use the trusted
   // forwarded protocol when it is present, while still requiring the Origin host

@@ -5,6 +5,9 @@ const envNames = [
   "CODESPACES",
   "CODESPACE_NAME",
   "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN",
+  "RENDER",
+  "RENDER_EXTERNAL_HOSTNAME",
+  "RENDER_EXTERNAL_URL",
 ] as const;
 const original = new Map<string, string | undefined>();
 
@@ -61,18 +64,36 @@ describe("same-origin request validation", () => {
     }))).toBe(true);
   });
 
-  it("accepts a Render HTTPS origin when TLS terminates before the internal HTTP handler", () => {
+  it("accepts the configured Render hostname when the request host is an internal proxy address", () => {
     const publicHost = "mynutri-ai-nutrition-tracker.onrender.com";
-    const proxied = new Request(`http://localhost:10000/api/meals`, {
+    process.env.RENDER = "true";
+    process.env.RENDER_EXTERNAL_HOSTNAME = publicHost;
+    const proxied = new Request("http://localhost:10000/api/meals", {
       method: "POST",
       headers: {
-        host: publicHost,
+        host: "localhost:10000",
         origin: `https://${publicHost}`,
         "x-forwarded-host": publicHost,
         "x-forwarded-proto": "https",
       },
     });
     expect(isSameOriginRequest(proxied)).toBe(true);
+  });
+
+  it("does not accept an unrelated Render hostname as this app's Origin", () => {
+    process.env.RENDER = "true";
+    process.env.RENDER_EXTERNAL_HOSTNAME = "mynutri-ai-nutrition-tracker.onrender.com";
+    const otherHost = "some-other-service.onrender.com";
+    const proxied = new Request("http://localhost:10000/api/meals", {
+      method: "POST",
+      headers: {
+        host: "localhost:10000",
+        origin: `https://${otherHost}`,
+        "x-forwarded-host": otherHost,
+        "x-forwarded-proto": "https",
+      },
+    });
+    expect(isSameOriginRequest(proxied)).toBe(false);
   });
 
   it("accepts a same-origin local development request", () => {
