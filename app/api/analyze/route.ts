@@ -150,24 +150,27 @@ function findCatalogFood(name:string,catalog:FoodCatalogRow[]):FoodCatalogRow|un
  if(!wanted)return undefined;
  return catalog.find(food=>[food.name,...(food.aliases??[])].some(alias=>normalizeFoodName(alias)===wanted));
 }
-function createAiEstimatedFood(nameInput:string,preparationInput:string,nutrientInput:unknown):FoodCatalogRow|null {
+function createAiEstimatedFood(nameInput:string,preparationInput:string,nutrientInput:unknown,groundingSources:GroundingSource[]):FoodCatalogRow|null{
  const name=nameInput.normalize("NFKC").replace(/[<>]/g," ").replace(/\s+/g," ").trim().slice(0,120);
  if(name.length<2||!/[^\s]/.test(name))return null;
- const parsed=estimatedNutrientsSchema.safeParse(nutrientInput);
- if(!parsed.success)return null;
+ const parsed=estimatedNutrientsSchema.safeParse(nutrientInput);if(!parsed.success)return null;
  const per100g:Record<string,number>={};
  for(const [key,value] of Object.entries(parsed.data)){if(typeof value==="number"&&Number.isFinite(value)&&value>=0)per100g[key]=value;}
  if(!["kcal","protein_g","carbs_g","fat_g"].every(key=>typeof per100g[key]==="number"))return null;
  const normalized=normalizeFoodName(name);
  const slug=normalized.normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,36)||"food";
  const id="ai-"+slug+"-"+createHash("sha256").update(normalized).digest("hex").slice(0,12);
- const now=new Date().toISOString();
- const preparation=preparationInput.trim().slice(0,160)||"as described";
+ const now=new Date().toISOString();const preparation=preparationInput.trim().slice(0,160)||"as described";
  const model=configuredGeminiModel()||"configured Gemini model";
- const provenance=Object.fromEntries(Object.keys(per100g).map(key=>[key,{source:"Gemini API estimate",model,estimatedAt:now,basis:"Approximate value per 100 g; not independently verified"}]));
- const sql="INSERT OR IGNORE INTO foods(id,name,aliases_json,preparation,nutrients_json,servings_json,source,source_version,confidence,completeness,source_url,source_record_id,source_basis,last_verified_at,source_license_note,nutrient_provenance_json,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,NULL,?,?,NULL,?,?,?)";
- try { getDb().prepare(sql).run(id,name,JSON.stringify([name]),preparation,JSON.stringify(per100g),JSON.stringify([{label:"100 g reference portion",grams:100}]),"Gemini AI estimate — not independently verified","gemini-provisional-v1","estimate","partial",id,"AI-generated approximate estimates per 100 g for "+name+"; preparation: "+preparation+". Not a verified IFCT/ICMR-NIN row.","AI-generated estimate; not an official nutrient database record.",JSON.stringify(provenance),now); } catch { return null; }
- return {id,name,aliases:[name],nutrients:per100g,preparation,source:"Gemini AI estimate — not independently verified",confidence:"estimate"};
+ const sources=groundingSources.map(source=>({title:source.title,url:source.url}));
+ const sourceLabel=sources.length?"Gemini AI estimate grounded with Google Search":"Gemini AI estimate — not independently verified";
+ const provenance=Object.fromEntries(Object.keys(per100g).map(key=>[key,{source:sources.length?"Gemini API estimate grounded with Google Search":"Gemini API estimate",model,estimatedAt:now,basis:"Approximate value per 100 g; not laboratory measured",sources}]));
+ const sourceBasis="AI-generated approximate nutrient estimates per 100 g for "+name+"; preparation: "+preparation+". Not a verified IFCT/ICMR-NIN row."+(sources.length?" Search grounding sources: "+sources.map(source=>source.title+" ("+source.url+")").join("; "):" No search citations were returned by Gemini.");
+ const sql="INSERT OR IGNORE INTO foods(id,name,aliases_json,preparation,nutrients_json,servings_json,source,source_version,confidence,completeness,source_url,source_record_id,source_basis,last_verified_at,source_license_note,nutrient_provenance_json,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,?,?)";
+ try{
+  getDb().prepare(sql).run(id,name,JSON.stringify([name]),preparation,JSON.stringify(per100g),JSON.stringify([{label:"100 g reference portion",grams:100}]),sourceLabel,"gemini-grounded-v1","estimate","partial",sources[0]?.url??null,id,sourceBasis,"AI-estimated values; search citations are stored per nutrient for traceability; not official laboratory values.",JSON.stringify(provenance),now);
+ }catch{return null;}
+ return {id,name,aliases:[name],nutrients:per100g,preparation,source:sourceLabel,confidence:"estimate"};
 }
 function proposedGrams(amount:number,unit:string,foodName:string):{grams:number|null;note:string} {
  try {const result=unitToGrams(amount,unit,foodName);return {grams:result.grams,note:result.note};}
