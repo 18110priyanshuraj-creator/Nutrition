@@ -114,6 +114,36 @@ function detectMime(bytes:Uint8Array):string|null{
  return null;
 }
 type FoodCatalogRow={id:string;name:string;aliases?:string[];nutrients:Record<string,number>;preparation:string;source:string;confidence:string};
+type GroundingSource={title:string;url:string};
+function extractGroundingSources(response:unknown):GroundingSource[]{
+ const data=response as {candidates?:Array<{groundingMetadata?:{groundingChunks?:Array<{web?:{uri?:unknown;title?:unknown}}>}}>};
+ const sources:GroundingSource[]=[];const seen=new Set<string>();
+ for(const candidate of data.candidates??[]){
+  for(const chunk of candidate.groundingMetadata?.groundingChunks??[]){
+   const raw=typeof chunk.web?.uri==="string"?chunk.web.uri.trim():"";if(!raw)continue;
+   try{const parsed=new URL(raw);if(!["http:","https:"].includes(parsed.protocol)||seen.has(parsed.href))continue;seen.add(parsed.href);sources.push({title:typeof chunk.web?.title==="string"?chunk.web.title.slice(0,180):parsed.hostname,url:parsed.href});}catch{}
+  }
+ }
+ return sources.slice(0,8);
+}
+function supplementMissingAiNutrients(food:FoodCatalogRow,nutrientInput:unknown,groundingSources:GroundingSource[]):FoodCatalogRow{
+ const parsed=estimatedNutrientsSchema.safeParse(nutrientInput);if(!parsed.success)return food;
+ try{
+  const db=getDb();
+  const stored=db.prepare("SELECT nutrients_json,nutrient_provenance_json FROM foods WHERE id=?").get(food.id) as {nutrients_json?:string;nutrient_provenance_json?:string}|undefined;
+  let current:Record<string,number>={...food.nutrients};let provenance:Record<string,unknown>={};
+  if(stored?.nutrients_json){try{current={...current,...JSON.parse(stored.nutrients_json) as Record<string,number>};}catch{}}
+  if(stored?.nutrient_provenance_json){try{provenance=JSON.parse(stored.nutrient_provenance_json) as Record<string,unknown>;}catch{}}
+  const additions:Record<string,number>={};
+  for(const [key,value] of Object.entries(parsed.data)){if(typeof value==="number"&&Number.isFinite(value)&&value>=0&&!Object.prototype.hasOwnProperty.call(current,key))additions[key]=value;}
+  if(!Object.keys(additions).length)return {...food,nutrients:current};
+  const now=new Date().toISOString();const sources=groundingSources.map(source=>({title:source.title,url:source.url}));const model=configuredGeminiModel()||"configured Gemini model";
+  for(const key of Object.keys(additions)){provenance[key]={source:sources.length?"Gemini estimate grounded with Google Search":"Gemini AI estimate",model,estimatedAt:now,basis:"Approximate value per 100 g; pre-existing catalog values were preserved",sources};}
+  const merged={...current,...additions};
+  db.prepare("UPDATE foods SET nutrients_json=?,nutrient_provenance_json=?,updated_at=? WHERE id=?").run(JSON.stringify(merged),JSON.stringify(provenance),now,food.id);
+  return {...food,nutrients:merged};
+ }catch(error){console.warn("[food-analysis] Could not supplement missing food nutrients",{foodId:food.id,category:classifyGeminiError(error)});return food;}
+}
 function normalizeFoodName(value:string):string { return value.trim().toLocaleLowerCase().normalize("NFKC").replace(/\s+/g," "); }
 function findCatalogFood(name:string,catalog:FoodCatalogRow[]):FoodCatalogRow|undefined {
  const wanted=normalizeFoodName(name);
