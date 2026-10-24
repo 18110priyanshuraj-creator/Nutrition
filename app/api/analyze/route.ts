@@ -228,7 +228,7 @@ export async function POST(request:NextRequest){
    attemptCount+=1;
    const ai=new GoogleGenAI({apiKey,httpOptions:{timeout:perKeyTimeoutMs,retryOptions:{attempts:1}}});
    const generated=await ai.models.generateContent({model,contents,config:{
-    maxOutputTokens:3072,thinkingConfig:{thinkingLevel:ThinkingLevel.LOW},tools:[{googleSearch:{}}],
+    maxOutputTokens:3072,thinkingConfig:{thinkingLevel:ThinkingLevel.LOW},
     responseMimeType:"application/json",responseJsonSchema:responseJsonSchema as never
    }});
    if(!generated.text?.trim())throw new Error("Gemini returned an empty response");
