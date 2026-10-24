@@ -139,7 +139,7 @@ describe("Gemini key failover", () => {
     });
     expect(result).toBe("ok");
     expect(tried).toEqual(["private-one", "private-two"]);
-    expect(delays).toEqual([250]);
+    expect(delays).toEqual([100]);
     const status = getGeminiProviderStatus({
       GEMINI_API_KEY_1: "private-one", GEMINI_API_KEY_2: "private-two",
       GEMINI_API_KEY_3: "private-three", GEMINI_API_KEY_4: "private-four", GEMINI_MODEL: "test-model",
@@ -223,7 +223,7 @@ describe("Gemini key failover", () => {
       else process.env.GEMINI_MAX_RETRIES = priorRetries;
     }
   });
-  it("uses bounded exponential backoff between transient failures", async () => {
+  it("uses short bounded backoff between transient failures", async () => {
     const delays: number[] = [];
     await expect(withGeminiKeyFailover(async () => {
       throw {status: 503, message: "temporary network failure"};
@@ -235,7 +235,7 @@ describe("Gemini key failover", () => {
       sleep: async (milliseconds) => { delays.push(milliseconds); },
     })).rejects.toMatchObject({category: "network"});
 
-    expect(delays).toEqual([250, 500, 1000]);
+    expect(delays).toEqual([100, 200, 300]);
   });
   it("stops on a missing model instead of rotating all keys", async () => {
     const tried: string[] = [];
