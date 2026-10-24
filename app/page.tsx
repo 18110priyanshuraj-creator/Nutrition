@@ -29,6 +29,15 @@ function isMealSaveAttempt(value:unknown):value is MealSaveAttempt{
 const nav=[["Today",LayoutDashboard],["Log Food",Plus],["Photo Scanner",Camera],["Nutrition Dashboard",Leaf],["Calendar & History",CalendarDays],["Nutrient Analysis",FlaskConical],["Weight & Growth",Ruler],["Food Library",BookOpen],["Recipes",ChefHat],["Reports & Export",FileDown],["Nutrition Assistant",MessageCircle],["Settings",Settings]] as const;
 const mealTypes=["Breakfast","Lunch","Dinner","Snack","Pre-workout","Post-workout","Other"];
 function indiaToday(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());}
+async function fetchWithTimeout(input:string,init:RequestInit={},timeoutMs=25_000,purpose="Request"):Promise<Response>{
+ const controller=new AbortController();
+ const timer=window.setTimeout(()=>controller.abort(),timeoutMs);
+ try{return await fetch(input,{...init,signal:controller.signal});}
+ catch(error){
+  if(controller.signal.aborted)throw new Error(purpose+" timed out after "+Math.ceil(timeoutMs/1000)+" seconds. Check the connection and Gemini settings, then retry.");
+  throw error;
+ }finally{window.clearTimeout(timer);}
+}
 function fmt(n:number,d=0){return new Intl.NumberFormat("en-IN",{maximumFractionDigits:d}).format(n);}
 function dayLabel(d:string){return new Date(d+"T12:00:00+05:30").toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short",timeZone:"Asia/Kolkata"});}
 function clock(s:string){return new Date(s).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Kolkata"});}
@@ -53,7 +62,7 @@ export default function Home(){
  const noteAttemptRef=useRef<{signature:string;key:string}|null>(null);
  const refresh=useCallback(async()=>{
   setLoading(true);setError("");
-  try{const [a,b,c,dRecipes,noteResponse]=await Promise.all([fetch("/api/dashboard?date="+encodeURIComponent(date),{cache:"no-store"}),fetch("/api/foods"),fetch("/api/measurements"),fetch("/api/recipes"),fetch("/api/notes?date="+encodeURIComponent(date),{cache:"no-store"})]);const [d,f,m,rec,notePayload]=await Promise.all([a.json(),b.json(),c.json(),dRecipes.json(),noteResponse.json()]);if(!a.ok)throw new Error(d.error||"Dashboard could not load.");if(!dRecipes.ok)throw new Error(rec.error||"Saved recipes could not load.");if(!noteResponse.ok)throw new Error(notePayload.error||"Daily notes could not load.");
+  try{const [a,b,c,dRecipes,noteResponse]=await Promise.all([fetchWithTimeout("/api/dashboard?date="+encodeURIComponent(date),{cache:"no-store"},20_000,"Dashboard refresh"),fetchWithTimeout("/api/foods",{},20_000,"Food library"),fetchWithTimeout("/api/measurements",{},20_000,"Measurements refresh"),fetchWithTimeout("/api/recipes",{},20_000,"Recipes refresh"),fetchWithTimeout("/api/notes?date="+encodeURIComponent(date),{cache:"no-store"},20_000,"Notes refresh")]);const [d,f,m,rec,notePayload]=await Promise.all([a.json(),b.json(),c.json(),dRecipes.json(),noteResponse.json()]);if(!a.ok)throw new Error(d.error||"Dashboard could not load.");if(!dRecipes.ok)throw new Error(rec.error||"Saved recipes could not load.");if(!noteResponse.ok)throw new Error(notePayload.error||"Daily notes could not load.");
    setData(d);setFoods(f.foods||[]);setMeasurements(m.measurements||[]);setRecipes(rec.recipes||[]);setNotes(notePayload.notes||[]);const p=d.profile||{};
    setProfile({displayName:p.display_name||"My profile",age:String(p.age??17),sex:p.sex||"male",heightCm:String(p.height_cm??160),weightKg:String(p.weight_kg??47),dietPreference:p.diet_preference||"vegetarian",region:p.region||"Indian home-cooked"});
    setTargetInputs(Object.fromEntries((d.definitions||[]).map((n:Row)=>[n.key,d.targets?.[n.key]?.target==null?"":String(d.targets[n.key].target)])));
@@ -69,7 +78,7 @@ export default function Home(){
  const historyByDate=useMemo(()=>Object.fromEntries(historyDays.map(d=>[String(d.date),d])),[historyDays]);
  const totals=data?.totals||{},targets=data?.targets||{},defs=(data?.definitions||[]) as NutrientDefinition[],meals=(data?.meals||[]) as Row[],itemCount=Number(data?.logSummary?.itemCount||0);
  function go(v:string){setView(v);setMenu(false);setError("");setMessage("");}
- async function api(url:string,method:string,body?:unknown){const r=await fetch(url,{method,headers:{"Content-Type":"application/json"},body:body===undefined?undefined:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||"Request failed.");return j;}
+ async function api(url:string,method:string,body?:unknown){const r=await fetchWithTimeout(url,{method,headers:{"Content-Type":"application/json"},body:body===undefined?undefined:JSON.stringify(body)},25_000,"Saving or loading data");const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||"Request failed.");return j;}
  function state(key:string){const n=totals[key],target=targets[key]?.target??null,amount=Number(n?.amount??0),complete=Boolean(n?.complete)&&itemCount>0;return {target,amount,complete,remaining:complete?getRemaining(target,amount):null,progress:complete?getProgress(target,amount):null,unknown:Number(n?.unknownCount||0),label:!itemCount?"No entry recorded":!complete?"Data incomplete":target==null?"Target not configured":amount>=target?"Target reached":"Below selected target"};}
  function tile(key:string){const n=NUTRIENT_BY_KEY[key];if(!n)return null;const s=state(key);return <div className="nutrient-card" key={key}><div className="nutrient-name">{n.label}</div><div className="nutrient-value">{n.qualitative?"Qualitative proxy":s.complete?formatNutrient(key,s.amount):itemCount?"Partial data":"No entry"}</div><div className="nutrient-meta">Target: {targetLabel(n,s.target)}</div><Bar value={s.amount} target={s.complete?s.target:null}/><div className="nutrient-status"><span>{s.label}</span><span>{s.target!==null&&s.target>0&&s.complete?Math.round(100*s.amount/s.target)+"% of goal":s.remaining===null?"—":formatNutrient(key,s.remaining)+" left"}</span></div>{s.unknown>0?<div className="nutrient-meta">{s.unknown} item(s) unavailable</div>:null}{n.description?<div className="nutrient-meta">{n.description}</div>:null}</div>;}
  async function saveMeal(items:MealSubmissionItem[],source:"manual"|"text"|"photo",original:string):Promise<boolean>{
@@ -106,11 +115,19 @@ export default function Home(){
 async function analyzeText(){
   const description=text.trim();
   if(!description){setError("Describe a meal first.");return;}
-  setBusy(true);setError("");setMessage("");setMealStatus("Sending your description to Gemini for food recognition and nutrient estimation…");
+  setBusy(true);setError("");setMessage("");setMealStatus("Sending to Gemini; the app will automatically rotate keys if a key fails…");
   try{
-   const r=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:description})});
+   const r=await fetchWithTimeout("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:description})},75_000,"Gemini food analysis");
    const p=await r.json();
-   if(!r.ok){throw new Error(p.error||"Food analysis failed. Check Gemini provider setup and retry.");}
+   if(!r.ok){
+    const diagnostics=[
+     typeof p.category==="string"?"category: "+p.category:"",
+     Number.isFinite(p.elapsedMs)?"time: "+Math.round(Number(p.elapsedMs)/1000)+"s":"",
+     Number.isFinite(p.configuredSlots)?"keys configured: "+p.configuredSlots:"",
+     Array.isArray(p.attemptedSlots)&&p.attemptedSlots.length?"keys tried: "+p.attemptedSlots.join(", "):""
+    ].filter(Boolean);
+    throw new Error((p.error||"Food analysis failed. Check Gemini provider setup and retry.")+(diagnostics.length?" ("+diagnostics.join("; ")+")":""));
+   }
    const candidates=Array.isArray(p.candidates)?p.candidates as Row[]:[];
    const ready=candidates.filter(c=>typeof c.foodId==="string"&&c.foodId.length>0&&typeof c.grams==="number"&&Number.isFinite(c.grams)&&c.grams>0&&c.grams<=10000);
    if(!ready.length){
@@ -146,7 +163,7 @@ async function analyzeText(){
    saveAttemptRef.current=pending;
    if(pending.source==="text")setText(pending.original);
    setBusy(true);setError("");
-   void fetch("/api/meals",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({localDate:pending.localDate,loggedAt:pending.loggedAt,mealType:pending.mealType,source:pending.source,originalText:pending.original,idempotencyKey:pending.key,items:pending.items.map(item=>({...item,portionSource:item.portionSource??(item.portionEstimated?"estimated":"manual")}))})})
+   void fetchWithTimeout("/api/meals",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({localDate:pending.localDate,loggedAt:pending.loggedAt,mealType:pending.mealType,source:pending.source,originalText:pending.original,idempotencyKey:pending.key,items:pending.items.map(item=>({...item,portionSource:item.portionSource??(item.portionEstimated?"estimated":"manual")}))})},25_000,"Pending meal save")
     .then(async response=>{const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||"Pending meal could not be saved.");return payload;})
     .then(async payload=>{sessionStorage.removeItem(pendingMealStorageKey);saveAttemptRef.current=null;setSavedMealResult(payload.meal??null);setMessage("Your pending meal submission was safely recovered.");setText("");await refresh();})
     .catch(cause=>{setError(cause instanceof Error?cause.message:"Pending meal could not be saved; retry with the same submission.");})
@@ -160,11 +177,11 @@ async function analyzeText(){
   try{
    const form=new FormData();form.append("image",photo);form.append("description",photoNote);
    if(photoMode==="label"){
-    const r=await fetch("/api/label-analysis",{method:"POST",body:form});const p=await r.json();
+    const r=await fetchWithTimeout("/api/label-analysis",{method:"POST",body:form},90_000,"Gemini nutrition-label analysis");const p=await r.json();
     if(!r.ok)throw new Error(p.error||"Label analysis failed.");
     await saveLabelFood(p);return;
    }
-   const r=await fetch("/api/analyze",{method:"POST",body:form});const p=await r.json();
+   const r=await fetchWithTimeout("/api/analyze",{method:"POST",body:form},95_000,"Gemini food-photo analysis");const p=await r.json();
    if(!r.ok)throw new Error(p.error||"Photo analysis failed.");
    const candidates=Array.isArray(p.candidates)?p.candidates as Row[]:[];
    const ready=candidates.filter(c=>typeof c.foodId==="string"&&c.foodId.length>0&&typeof c.grams==="number"&&Number.isFinite(c.grams)&&c.grams>0&&c.grams<=10000);
@@ -208,7 +225,7 @@ function addRecipeIngredient(){const amount=Number(recipeGrams);if(!recipeFoodId
  async function deleteRecipe(id:string){if(!window.confirm("Delete this saved recipe?"))return;try{await api("/api/recipes/"+id,"DELETE");if(editingRecipeId===id){setEditingRecipeId(null);setRecipeIngredients([]);setRecipeName("");setRecipeDescription("");}setMessage("Recipe deleted.");await refresh();}catch(e){setError(e instanceof Error?e.message:"Could not delete recipe.");}}
  async function saveSettings(e:React.FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);try{const p={displayName:String(profile.displayName||"My profile"),age:Number(profile.age),sex:profile.sex,heightCm:Number(profile.heightCm),weightKg:Number(profile.weightKg),dietPreference:profile.dietPreference,region:String(profile.region||"Indian home-cooked")};const t=defs.map(n=>({key:n.key,target:targetInputs[n.key]===""?null:Number(targetInputs[n.key])}));await api("/api/profile","PATCH",{profile:p,targets:t});setProvider(null);setMessage("Profile and custom targets saved.");await refresh();}catch(e){setError(e instanceof Error?e.message:"Settings save failed.");}finally{setBusy(false);}}
  async function askAssistant(e:React.FormEvent<HTMLFormElement>){e.preventDefault();if(!assistantQuestion.trim())return;setAssistantBusy(true);setError("");setAssistantAnswer(null);try{const answer=await api("/api/assistant","POST",{question:assistantQuestion,date});setAssistantAnswer(answer);}catch(x){setError(x instanceof Error?x.message:"Assistant request failed.");}finally{setAssistantBusy(false);}}
- async function testGemini(){setBusy(true);try{const r=await fetch("/api/provider-status",{method:"POST"}),p=await r.json();setProvider((old:Row)=>({...old,testMessage:p.message||p.error,testOk:Boolean(r.ok&&p.ok)}));if(!r.ok)throw new Error(p.error||"Gemini test failed.");setMessage("Gemini test request succeeded.");}catch(e){setError(e instanceof Error?e.message:"Gemini test failed.");}finally{setBusy(false);}}
+ async function testGemini(){setBusy(true);try{const r=await fetchWithTimeout("/api/provider-status",{method:"POST"},80_000,"Gemini connection test"),p=await r.json();setProvider((old:Row)=>({...old,testMessage:p.message||p.error,testOk:Boolean(r.ok&&p.ok)}));if(!r.ok)throw new Error(p.error||"Gemini test failed.");setMessage("Gemini test request succeeded.");}catch(e){setError(e instanceof Error?e.message:"Gemini test failed.");}finally{setBusy(false);}}
  async function logout(){await fetch("/api/auth/logout",{method:"POST"});router.replace("/login");router.refresh();}
  async function restorePersonalData(){if(!restoreFile){setError("Choose a MyNutri AI JSON export first.");return;}if(restoreFile.size>12*1024*1024){setError("Restore file must be 12 MB or smaller.");return;}const confirmation=window.prompt("Restore runs only when the current personal log store is empty; it will restore profile settings and imported records. Type RESTORE MY NUTRI DATA to continue.");if(confirmation!=="RESTORE MY NUTRI DATA")return;setBusy(true);setError("");try{const payload=JSON.parse(await restoreFile.text());const result=await api("/api/restore","POST",{confirmation:"RESTORE_MY_NUTRI_DATA",payload});setMessage("Restore complete: "+result.restored.meals+" meal(s), "+result.restored.foodItems+" food item(s), "+result.restored.measurements+" measurement(s).");setRestoreFile(null);await refresh();}catch(e){setError(e instanceof Error?e.message:"Could not restore export.");}finally{setBusy(false);}}
  async function deletePersonalData(){const confirmation=window.prompt("This permanently deletes personal meal logs, measurements, notes and target history. Food catalog records remain. Type DELETE MY PERSONAL DATA to continue.");if(confirmation!=="DELETE MY PERSONAL DATA")return;setBusy(true);setError("");try{await api("/api/data","DELETE",{confirmation:"DELETE_MY_PERSONAL_DATA"});setMessage("Personal meal logs and measurements deleted. The general food catalog and owner login remain.");await refresh();}catch(e){setError(e instanceof Error?e.message:"Could not delete personal records.");}finally{setBusy(false);}}
