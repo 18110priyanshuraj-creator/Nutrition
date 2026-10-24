@@ -47,51 +47,6 @@ const estimatedNutrientsSchema=z.object({
  molybdenum_ug:z.number().nonnegative().max(50000).optional(),
 }).strict();
 const proposalSchema=z.object({items:z.array(z.object({foodName:z.string().min(1).max(120),amount:z.number().positive().max(10000),unit:z.string().min(1).max(24),preparation:z.string().max(160),confidence:z.enum(["low","medium","high"]),notes:z.string().max(240),nutrientsPer100g:estimatedNutrientsSchema.optional()})).max(30),summary:z.string().max(400)});
-const responseJsonSchema={
- type:"object",properties:{
-  items:{type:"array",items:{type:"object",properties:{
-   foodName:{type:"string"},amount:{type:"number"},unit:{type:"string",enum:["g","ml","piece","roti","katori","bowl","cup","glass","tbsp","tsp"]},
-   preparation:{type:"string"},confidence:{type:"string",enum:["low","medium","high"]},notes:{type:"string"},
-   nutrientsPer100g:{type:"object",properties:{
-    kcal:{type:"number"},
-    protein_g:{type:"number"},
-    carbs_g:{type:"number"},
-    fat_g:{type:"number"},
-    calcium_mg:{type:"number"},
-    phosphorus_mg:{type:"number"},
-    magnesium_mg:{type:"number"},
-    potassium_mg:{type:"number"},
-    sodium_mg:{type:"number"},
-    zinc_mg:{type:"number"},
-    iron_mg:{type:"number"},
-    vit_a_ug:{type:"number"},
-    vit_c_mg:{type:"number"},
-    vit_d_ug:{type:"number"},
-    vit_e_mg:{type:"number"},
-    vit_k_ug:{type:"number"},
-    vit_b1_mg:{type:"number"},
-    vit_b2_mg:{type:"number"},
-    vit_b3_mg:{type:"number"},
-    vit_b5_mg:{type:"number"},
-    vit_b6_mg:{type:"number"},
-    vit_b7_ug:{type:"number"},
-    vit_b9_ug:{type:"number"},
-    vit_b12_ug:{type:"number"},
-    omega3_g:{type:"number"},
-    omega6_g:{type:"number"},
-    iodine_ug:{type:"number"},
-    copper_ug:{type:"number"},
-    manganese_mg:{type:"number"},
-    selenium_ug:{type:"number"},
-    chloride_mg:{type:"number"},
-    fluoride_mg:{type:"number"},
-    chromium_ug:{type:"number"},
-    molybdenum_ug:{type:"number"}
-   },required:["kcal","protein_g","carbs_g","fat_g"],propertyOrdering:["kcal","protein_g","carbs_g","fat_g","calcium_mg","phosphorus_mg","magnesium_mg","potassium_mg","sodium_mg","zinc_mg","iron_mg","vit_a_ug","vit_c_mg","vit_d_ug","vit_e_mg","vit_k_ug","vit_b1_mg","vit_b2_mg","vit_b3_mg","vit_b5_mg","vit_b6_mg","vit_b7_ug","vit_b9_ug","vit_b12_ug","omega3_g","omega6_g","iodine_ug","copper_ug","manganese_mg","selenium_ug","chloride_mg","fluoride_mg","chromium_ug","molybdenum_ug"],additionalProperties:false}
-  },required:["foodName","amount","unit","preparation","confidence","notes","nutrientsPer100g"],propertyOrdering:["foodName","amount","unit","preparation","confidence","notes","nutrientsPer100g"]}},
-  summary:{type:"string"}
- },required:["items","summary"],propertyOrdering:["summary","items"]
-};
 function rateLimit(request:NextRequest):boolean{
  const ip=request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()||"unknown";const now=Date.now();const previous=limits.get(ip);
  if(previous&&now-previous.start<60_000&&previous.count>=8)return false;
