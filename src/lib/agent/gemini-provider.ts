@@ -213,7 +213,7 @@ export async function withGeminiKeyFailover<T>(
         && (category === "rate_limit" || category === "timeout" || category === "network"
           || category === "invalid_key" || category === "permission" || category === "unknown")
       ) {
-        await sleep(Math.min(2000, 250 * 2 ** (attemptedSlots.length - 1)));
+        await sleep(Math.min(300, 100 * attemptedSlots.length));
       }
     }
   }
