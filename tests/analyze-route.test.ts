@@ -3,18 +3,19 @@ import {NextRequest} from "next/server";
 import {resetGeminiProviderStateForTests} from "../src/lib/agent/gemini-provider";
 import {POST} from "../app/api/analyze/route";
 
-const mocked = vi.hoisted(() => ({generateContent: vi.fn(), dbRun: vi.fn(), dbPrepare: vi.fn()}));
+const mocked = vi.hoisted(() => ({generateContent: vi.fn(), dbRun: vi.fn(), dbPrepare: vi.fn(), dbGet: vi.fn(), apiKeys: [] as string[]}));
 
 vi.mock("@google/genai", () => ({
   ThinkingLevel: {LOW: "LOW"},
   GoogleGenAI: class {
+    constructor(options: {apiKey: string; httpOptions?: unknown}) { mocked.apiKeys.push(options.apiKey); }
     models = {generateContent: mocked.generateContent};
   },
 }));
 
 vi.mock("@/lib/server-auth", () => ({requireOwner: async () => null}));
 vi.mock("@/lib/db", () => ({
-  getDb: () => ({prepare: (sql: string) => {mocked.dbPrepare(sql); return {run: mocked.dbRun};}}),
+  getDb: () => ({prepare: (sql: string) => {mocked.dbPrepare(sql); return {run: mocked.dbRun, get: mocked.dbGet};}}),
 }));
 vi.mock("@/lib/server-data", () => ({
   foodList: () => [
@@ -48,6 +49,8 @@ beforeEach(() => {
   mocked.generateContent.mockReset();
   mocked.dbRun.mockReset();
   mocked.dbPrepare.mockReset();
+  mocked.dbGet.mockReset();
+  mocked.apiKeys.length = 0;
   resetGeminiProviderStateForTests();
 });
 
@@ -125,6 +128,38 @@ describe("food analysis through the shared Gemini keyring", () => {
     expect(body.error).toContain("timed out or failed temporarily");
     expect(JSON.stringify(body)).not.toContain("private-photo-test-key");
     expect(JSON.stringify(body)).not.toContain("fetch failed");
+  });
+
+  it("rotates to the next Gemini key on an empty response and grounds food nutrients with Google Search", async () => {
+    process.env.GEMINI_API_KEY_1 = "private-first-key";
+    process.env.GEMINI_API_KEY_2 = "private-second-key";
+    process.env.GEMINI_MODEL = "gemini-3.8-flash";
+    mocked.generateContent
+      .mockResolvedValueOnce({text: ""})
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          items: [{
+            foodName: "Banana, raw", amount: 1, unit: "piece", preparation: "raw",
+            confidence: "high", notes: "Reference entry", nutrientsPer100g: {
+              kcal: 89, protein_g: 1.1, carbs_g: 22.8, fat_g: 0.3, potassium_mg: 358
+            }
+          }],
+          summary: "One banana, estimated from a food-composition reference"
+        }),
+        candidates: [{groundingMetadata:{groundingChunks:[{web:{uri:"https://fdc.nal.usda.gov/",title:"USDA FoodData Central"}}]}}],
+      });
+
+    const response = await POST(request("1 banana"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mocked.apiKeys).toEqual(["private-first-key", "private-second-key"]);
+    expect(mocked.generateContent).toHaveBeenCalledTimes(2);
+    expect(mocked.generateContent.mock.calls[1][0].config.tools).toEqual([{googleSearch:{}}]);
+    expect(body.groundingSources).toEqual([{title:"USDA FoodData Central",url:"https://fdc.nal.usda.gov/"}]);
+    expect(body.candidates[0]).toMatchObject({foodId:"banana-raw",foodName:"Banana, raw"});
+    expect(mocked.dbPrepare.mock.calls.some((call)=>String(call[0]).includes("UPDATE foods SET nutrients_json"))).toBe(true);
+    expect(JSON.stringify(body)).not.toContain("private-first-key");
   });
 
   it("creates a provisional catalog record for a recognized food missing from the catalog", async () => {
