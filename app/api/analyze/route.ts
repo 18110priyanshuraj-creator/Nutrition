@@ -258,7 +258,7 @@ export async function POST(request:NextRequest){
    matched=supplementMissingAiNutrients(matched,item.nutrientsPer100g,groundingSources);
   }
   if(!matched&&item.nutrientsPer100g){
-   const created=createAiEstimatedFood(item.foodName,item.preparation,item.nutrientsPer100g);
+   const created=createAiEstimatedFood(item.foodName,item.preparation,item.nutrientsPer100g,groundingSources);
    if(created){
     const existing=catalog.find(food=>food.id===created.id);
     matched=existing??created;
