@@ -248,33 +248,6 @@ export async function POST(request:NextRequest){
   const failure=safeGeminiError(error);
   return NextResponse.json({error:failure.message,category,model,elapsedMs,attemptedSlots,configuredSlots},{status:failure.status});
  }
-  let resultText:string;
- const startedAt=Date.now();
- // Per-key timeouts are capped so a bad slot cannot leave the food log spinning for minutes.
- const perKeyTimeoutMs=Math.min(geminiRequestTimeoutMs(),imageData?12_000:8_000);
- const configuredSlots=configuredGeminiKeys().length;
- try{
-  const contents=imageData?[prompt,{inlineData:{mimeType:imageData.mimeType,data:imageData.data}}]:prompt;
-  const response=await withGeminiKeyFailover(async(apiKey)=>{
-   const ai=new GoogleGenAI({apiKey,httpOptions:{timeout:perKeyTimeoutMs,retryOptions:{attempts:1}}});
-   return ai.models.generateContent({model,contents,config:{maxOutputTokens:3072,thinkingConfig:{thinkingLevel:ThinkingLevel.LOW},responseMimeType:"application/json",responseJsonSchema:responseJsonSchema as never}});
-  },{maxAttempts:configuredSlots});
-  resultText=response.text||"";
-  if(!resultText.trim()){
-   return NextResponse.json({error:"Gemini returned an empty response. No meal was saved; try again or check the Gemini connection.",category:"empty_response",model,elapsedMs:Date.now()-startedAt},{status:502});
-  }
- }catch(error){
-  const category=classifyGeminiError(error);
-  const attemptedSlots=error&&typeof error==="object"&&Array.isArray((error as {attemptedSlots?:unknown}).attemptedSlots)
-   ?((error as {attemptedSlots:unknown[]}).attemptedSlots.filter((slot):slot is string=>typeof slot==="string"&&/^Slot [1-7]$/.test(slot)))
-   :[];
-  const elapsedMs=Date.now()-startedAt;
-  // Log only safe diagnostics: never food descriptions, raw provider errors, or API keys.
-  console.warn("[food-analysis] Gemini call failed",{category,model,elapsedMs,image:Boolean(imageData),configuredSlots,attemptedSlots});
-  const failure=safeGeminiError(error);
-  return NextResponse.json({error:failure.message,category,model,elapsedMs,attemptedSlots,configuredSlots},{status:failure.status});
- }
-
  let parsedJson:unknown;
  try{parsedJson=JSON.parse(resultText);}catch{return NextResponse.json({error:"Gemini returned an invalid structured response. Nothing was saved."},{status:502});}
  const validated=proposalSchema.safeParse(parsedJson);
