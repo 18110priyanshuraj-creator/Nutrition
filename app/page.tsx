@@ -115,9 +115,9 @@ export default function Home(){
 async function analyzeText(){
   const description=text.trim();
   if(!description){setError("Describe a meal first.");return;}
-  setBusy(true);setError("");setMessage("");setMealStatus("Sending to Gemini; the app will automatically rotate keys if a key fails…");
+  setBusy(true);setError("");setMessage("");setMealStatus("Sending to Gemini: searching food references and calculating nutrients…");
   try{
-   const r=await fetchWithTimeout("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:description})},75_000,"Gemini food analysis");
+   const r=await fetchWithTimeout("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:description})},50_000,"Gemini food analysis");
    const p=await r.json();
    if(!r.ok){
     const diagnostics=[
@@ -143,7 +143,12 @@ async function analyzeText(){
     portionNote:String(c.portionNote||c.notes||"")
    }));
    const saved=await saveMeal(items,"text",description);
-   if(saved)setMessage("Meal automatically saved. Portion sizes and AI-estimated nutrient values are approximate.");
+   if(saved){
+    const sources=Array.isArray(p.groundingSources)?p.groundingSources.length:0;
+    setMessage(sources
+     ?"Meal saved automatically. Gemini searched and recorded "+sources+" source(s). Nutrients and portions are estimates."
+     :"Meal saved automatically. Gemini returned no source citations; nutrients and portions are estimates.");
+   }
   }catch(e){setError(e instanceof Error?e.message:"Meal analysis or save failed.");}
   finally{setBusy(false);setMealStatus("");}
  }
@@ -173,7 +178,7 @@ async function analyzeText(){
  },[refresh]);
  async function analyzePhoto(){
   if(!photo){setError("Choose a photo first.");return;}
-  setBusy(true);setError("");setMealStatus(photoMode==="label"?"Reading nutrition label…":"Sending your photo to Gemini for food and portion estimation…");
+  setBusy(true);setError("");setMealStatus(photoMode==="label"?"Reading nutrition label…":"Sending photo to Gemini: searching food references and estimating portions…");
   try{
    const form=new FormData();form.append("image",photo);form.append("description",photoNote);
    if(photoMode==="label"){
@@ -181,14 +186,19 @@ async function analyzeText(){
     if(!r.ok)throw new Error(p.error||"Label analysis failed.");
     await saveLabelFood(p);return;
    }
-   const r=await fetchWithTimeout("/api/analyze",{method:"POST",body:form},95_000,"Gemini food-photo analysis");const p=await r.json();
+   const r=await fetchWithTimeout("/api/analyze",{method:"POST",body:form},65_000,"Gemini food-photo analysis");const p=await r.json();
    if(!r.ok)throw new Error(p.error||"Photo analysis failed.");
    const candidates=Array.isArray(p.candidates)?p.candidates as Row[]:[];
    const ready=candidates.filter(c=>typeof c.foodId==="string"&&c.foodId.length>0&&typeof c.grams==="number"&&Number.isFinite(c.grams)&&c.grams>0&&c.grams<=10000);
    if(!ready.length)throw new Error("Gemini could not estimate food and portions from this photo. Try a closer, clearer photo of the plate.");
    const items:MealSubmissionItem[]=ready.map(c=>({foodId:String(c.foodId),grams:Number(c.grams),portionEstimated:true,portionSource:"estimated",portionAmount:typeof c.amount==="number"&&c.amount>0?c.amount:undefined,portionUnit:typeof c.unit==="string"?c.unit:undefined,preparation:String(c.preparation||"as pictured"),portionNote:String(c.portionNote||c.notes||"Image-based portion estimate; actual weight may differ.")}));
    const saved=await saveMeal(items,"photo",photoNote||String(p.summary||"Food photo"));
-   if(saved)setMessage(ready.length<candidates.length?"Photo meal automatically saved. Food identities and portions are AI estimates; hidden ingredients may be missed.":"Photo meal automatically saved. Food identities and portions are AI estimates; hidden ingredients may be missed.");
+   if(saved){
+    const sources=Array.isArray(p.groundingSources)?p.groundingSources.length:0;
+    setMessage(sources
+     ?"Photo meal saved automatically. Gemini searched and recorded "+sources+" source(s); portions remain estimates."
+     :"Photo meal saved automatically. No source citations were returned; portions remain estimates.");
+   }
   }catch(e){setError(e instanceof Error?e.message:"Photo analysis failed.");}
   finally{setBusy(false);setMealStatus("");}
  }
